@@ -265,20 +265,105 @@ export const productService = {
   // Create a new product
   async createProduct(productData) {
     try {
-      return await apiClient.post('/products', productData);
-    } catch (error) {
-      console.error('Error creating product:', error);
-      throw error;
+      console.log('Creating product in Supabase:', productData);
+      
+      // Format data for Supabase schema - only include fields that exist in the database
+      const supabaseProduct = {
+        name: productData.name,
+        description: productData.description,
+        price: Number(productData.price), // Ensure price is a number
+        image_url: productData.imageUrl || '',
+        slug: productData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-$/, '') // Generate slug from name
+      };
+      
+      console.log('Formatted product for Supabase:', supabaseProduct);
+      
+      // Insert into Supabase
+      const { data, error } = await supabase
+        .from('products')
+        .insert(supabaseProduct)
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Supabase error details:', error);
+        throw error;
+      }
+      
+      console.log('Product created successfully in Supabase:', data);
+      
+      // Format response to match expected format
+      return {
+        id: data.id,
+        name: data.name,
+        description: data.description,
+        price: data.price,
+        imageUrl: data.image_url,
+        inventory: 0, // Default since the field doesn't exist
+        sku: 'SKU-' + data.id, // Generated SKU since it doesn't exist
+        status: 'In Stock', // Default status since is_active doesn't exist
+        category: 'Uncategorized', // Default since the field doesn't exist
+        createdAt: data.created_at
+      };
+    } catch (supabaseError) {
+      console.error('Error creating product in Supabase:', supabaseError);
+      
+      // Don't fall back to API, just throw the error
+      throw new Error(`Failed to create product: ${supabaseError.message || 'Unknown error'}`);
     }
   },
   
   // Update an existing product
   async updateProduct(id, productData) {
     try {
-      return await apiClient.put(`/products/${id}`, productData);
-    } catch (error) {
-      console.error('Error updating product:', error);
-      throw error;
+      console.log('Updating product in Supabase:', id, productData);
+      
+      // Format data for Supabase schema - only include fields that exist in the database
+      const supabaseProduct = {
+        name: productData.name,
+        description: productData.description,
+        price: Number(productData.price), // Ensure price is a number
+        image_url: productData.imageUrl || '',
+        slug: productData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-$/, '') // Generate slug from name
+      };
+      
+      console.log('Formatted product for Supabase update:', supabaseProduct);
+      
+      // Update in Supabase
+      const { data, error } = await supabase
+        .from('products')
+        .update(supabaseProduct)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      console.log('Product updated successfully in Supabase:', data);
+      
+      // Format response to match expected format
+      return {
+        id: data.id,
+        name: data.name,
+        description: data.description,
+        price: data.price,
+        imageUrl: data.image_url,
+        inventory: 0, // Default since the field doesn't exist
+        sku: 'SKU-' + data.id, // Generated SKU since it doesn't exist
+        status: 'In Stock', // Default status since is_active doesn't exist
+        category: 'Uncategorized', // Default since the field doesn't exist
+        updatedAt: data.updated_at
+      };
+    } catch (supabaseError) {
+      console.error('Error updating product in Supabase:', supabaseError);
+      
+      // Fallback to API
+      try {
+        return await apiClient.put(`/products/${id}`, productData);
+      } catch (error) {
+        console.error('Error updating product:', error);
+        throw error;
+      }
     }
   },
   
@@ -329,29 +414,43 @@ export const productService = {
   // Upload product image
   async uploadImage(file) {
     try {
-      const formData = new FormData();
-      formData.append('image', file);
+      console.log('Uploading image to Supabase storage');
       
-      const token = await getAuthToken();
-      const response = await fetch(`${API_URL}/products/upload-image`, {
-        method: 'POST',
-        headers: {
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: formData
-      });
+      // Create a unique file name
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+      const filePath = `products/${fileName}`;
       
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Image upload failed');
+      // Upload to Supabase Storage
+      const { data, error } = await supabase
+        .storage
+        .from('product-images') // Make sure this bucket exists in your Supabase
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+      
+      if (error) {
+        console.error('Error uploading to Supabase Storage:', error);
+        throw error;
       }
       
-      return await response.json();
+      // Get the public URL
+      const { data: publicUrlData } = supabase
+        .storage
+        .from('product-images')
+        .getPublicUrl(filePath);
+      
+      console.log('Image uploaded successfully:', publicUrlData);
+      
+      return { 
+        imageUrl: publicUrlData.publicUrl
+      };
     } catch (error) {
       console.error('Error uploading image:', error);
       
       // Return a placeholder image URL as fallback
-      return { imageUrl: `https://picsum.photos/seed/${Date.now()}/400/300` };
+      return { imageUrl: `https://placehold.co/400x300?text=No+Image` };
     }
   },
   
@@ -368,6 +467,8 @@ export const productService = {
         return { products: [] };
       }
       
+      console.log('Raw products from Supabase:', data);
+      
       // Map to our expected format
       const formattedProducts = data.map(product => ({
         id: product.id,
@@ -375,10 +476,11 @@ export const productService = {
         description: product.description,
         price: product.price,
         imageUrl: product.image_url,
-        inventory: product.inventory_count || product.inventory || 0,
-        sku: product.sku,
-        status: product.is_active ? 'In Stock' : 'Out of Stock',
-        category: product.category || 'Uncategorized',
+        inventory: 0, // Default since field doesn't exist in DB
+        sku: 'SKU-' + product.id, // Generated SKU since it doesn't exist
+        status: 'In Stock', // Default since is_active doesn't exist
+        category: 'Uncategorized', // Category doesn't exist in our DB
+        createdAt: product.created_at
       }));
       
       return { 
