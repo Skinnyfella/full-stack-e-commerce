@@ -30,6 +30,56 @@ function ProductCatalog() {
     setIsLoading(true)
     setError(null)
     try {
+      // Try loading from Supabase first
+      const supabaseData = await productService.getSupabaseProducts();
+      
+      if (supabaseData.products.length > 0) {
+        console.log('Loaded products from Supabase:', supabaseData.products.length);
+        
+        // Filter products based on current filters
+        let filteredProducts = [...supabaseData.products];
+        
+        if (filterParams.search) {
+          const searchLower = filterParams.search.toLowerCase();
+          filteredProducts = filteredProducts.filter(product => 
+            product.name.toLowerCase().includes(searchLower) ||
+            (product.description && product.description.toLowerCase().includes(searchLower)) ||
+            (product.sku && product.sku.toLowerCase().includes(searchLower))
+          );
+        }
+        
+        if (filterParams.category) {
+          filteredProducts = filteredProducts.filter(product => 
+            product.category === filterParams.category
+          );
+        }
+        
+        // Sort products
+        filteredProducts.sort((a, b) => {
+          const sortField = filterParams.sortBy;
+          if (filterParams.sortOrder === 'asc') {
+            return a[sortField] > b[sortField] ? 1 : -1;
+          } else {
+            return a[sortField] < b[sortField] ? 1 : -1;
+          }
+        });
+        
+        // Implement pagination
+        const startIndex = (page - 1) * pagination.limit;
+        const endIndex = page * pagination.limit;
+        const paginatedProducts = filteredProducts.slice(startIndex, endIndex);
+        
+        setProducts(paginatedProducts);
+        setPagination({
+          page: parseInt(page),
+          limit: pagination.limit,
+          total: filteredProducts.length,
+          totalPages: Math.ceil(filteredProducts.length / pagination.limit)
+        });
+        return;
+      }
+      
+      // Fallback to regular API if no Supabase products
       const data = await productService.getProducts({
         page,
         limit: pagination.limit,

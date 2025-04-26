@@ -1,9 +1,9 @@
-// Mock order service
-// In a real application, this would make API calls to your backend
+// Order service that uses Supabase
+import { supabase } from '../utils/supabase';
+import { supabaseApi, apiClient } from './api';
+import { toast } from 'react-hot-toast';
 
-import { apiClient } from './api';
-
-// Generate sample orders
+// Generate sample orders for fallback
 const generateMockOrders = () => {
   const statuses = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled']
   const customers = [
@@ -52,185 +52,544 @@ const generateMockOrders = () => {
   })
 }
 
-// Mock order data
+// Mock order data for fallback
 let mockOrders = generateMockOrders()
-
-// Simulate API delay
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 
 export const orderService = {
   // Get all orders with pagination, sorting, and filtering
   async getOrders(params = {}) {
     try {
-      return await apiClient.get('/orders', params);
-    } catch (error) {
-      console.log('Error fetching orders from API, using mock data');
+      console.log('Fetching orders from Supabase');
       
-      // Fallback to mock data
       const { 
         page = 1, 
         limit = 10, 
         status = '',
         startDate = '',
         endDate = '',
-        sortBy = 'createdAt',
+        sortBy = 'created_at',
         sortOrder = 'desc'
       } = params;
       
-      // Filter orders
-      let filteredOrders = [...mockOrders];
-      
+      // Start query
+      let query = supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items(*)
+        `);
+        
+      // Apply filters
       if (status) {
-        filteredOrders = filteredOrders.filter(order => order.status === status);
+        query = query.eq('status', status);
       }
       
       if (startDate) {
-        const startTimestamp = new Date(startDate).getTime();
-        filteredOrders = filteredOrders.filter(order => 
-          new Date(order.createdAt).getTime() >= startTimestamp
-        );
+        query = query.gte('created_at', startDate);
       }
       
       if (endDate) {
-        const endTimestamp = new Date(endDate).getTime() + (24 * 60 * 60 * 1000); // Include the full day
-        filteredOrders = filteredOrders.filter(order => 
-          new Date(order.createdAt).getTime() <= endTimestamp
-        );
+        // Add 1 day to include the full end date
+        const nextDay = new Date(endDate);
+        nextDay.setDate(nextDay.getDate() + 1);
+        query = query.lt('created_at', nextDay.toISOString());
       }
       
-      // Sort orders
-      filteredOrders.sort((a, b) => {
-        if (sortOrder === 'asc') {
-          return a[sortBy] > b[sortBy] ? 1 : -1;
-        } else {
-          return a[sortBy] < b[sortBy] ? 1 : -1;
-        }
-      });
+      // Apply sorting - handle conversion from camelCase to snake_case
+      let dbSortBy = sortBy;
+      if (sortBy === 'createdAt') dbSortBy = 'created_at';
+      if (sortBy === 'updatedAt') dbSortBy = 'updated_at';
+      if (sortBy === 'userId') dbSortBy = 'user_id';
       
-      // Implement pagination
-      const startIndex = (page - 1) * limit;
-      const endIndex = page * limit;
-      const paginatedOrders = filteredOrders.slice(startIndex, endIndex);
+      const ascending = sortOrder === 'asc';
+      query = query.order(dbSortBy, { ascending });
+      
+      // Apply pagination
+      const startRange = (page - 1) * limit;
+      const endRange = page * limit - 1;
+      query = query.range(startRange, endRange);
+      
+      // Execute query
+      const { data, error } = await query;
+      
+      if (error) throw error;
+      
+      // Get total count for pagination
+      const { count, error: countError } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true });
+        
+      if (countError) throw countError;
+      
+      // Format orders to match expected structure
+      const formattedOrders = data.map(order => ({
+        id: order.id,
+        customerId: order.user_id,
+        customerName: order.customer_name || 'Unknown Customer',
+        status: order.status,
+        items: order.order_items || [],
+        subtotal: order.subtotal,
+        tax: order.tax,
+        shipping: order.shipping,
+        total: order.total,
+        shippingAddress: order.shipping_address || {},
+        createdAt: order.created_at
+      }));
       
       return {
-        orders: paginatedOrders,
+        orders: formattedOrders,
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
-          total: filteredOrders.length,
-          totalPages: Math.ceil(filteredOrders.length / limit)
+          total: count,
+          totalPages: Math.ceil(count / limit)
         }
       };
+    } catch (error) {
+      console.error('Error fetching orders from Supabase:', error);
+      
+      // Fallback to API
+      try {
+        return await apiClient.get('/orders', params);
+      } catch (apiError) {
+        console.log('Error fetching orders from API, using mock data');
+        
+        // Fallback to mock data
+        const { 
+          page = 1, 
+          limit = 10, 
+          status = '',
+          startDate = '',
+          endDate = '',
+          sortBy = 'createdAt',
+          sortOrder = 'desc'
+        } = params;
+        
+        // Filter orders
+        let filteredOrders = [...mockOrders];
+        
+        if (status) {
+          filteredOrders = filteredOrders.filter(order => order.status === status);
+        }
+        
+        if (startDate) {
+          const startTimestamp = new Date(startDate).getTime();
+          filteredOrders = filteredOrders.filter(order => 
+            new Date(order.createdAt).getTime() >= startTimestamp
+          );
+        }
+        
+        if (endDate) {
+          const endTimestamp = new Date(endDate).getTime() + (24 * 60 * 60 * 1000); // Include the full day
+          filteredOrders = filteredOrders.filter(order => 
+            new Date(order.createdAt).getTime() <= endTimestamp
+          );
+        }
+        
+        // Sort orders
+        filteredOrders.sort((a, b) => {
+          if (sortOrder === 'asc') {
+            return a[sortBy] > b[sortBy] ? 1 : -1;
+          } else {
+            return a[sortBy] < b[sortBy] ? 1 : -1;
+          }
+        });
+        
+        // Implement pagination
+        const startIndex = (page - 1) * limit;
+        const endIndex = page * limit;
+        const paginatedOrders = filteredOrders.slice(startIndex, endIndex);
+        
+        return {
+          orders: paginatedOrders,
+          pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total: filteredOrders.length,
+            totalPages: Math.ceil(filteredOrders.length / limit)
+          }
+        };
+      }
     }
   },
   
   // Get a single order by ID
   async getOrderById(id) {
     try {
-      return await apiClient.get(`/orders/${id}`);
+      console.log('Fetching order from Supabase:', id);
+      
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items(*)
+        `)
+        .eq('id', id)
+        .single();
+      
+      if (error) throw error;
+      
+      // Format order to match expected structure
+      return {
+        id: data.id,
+        customerId: data.user_id,
+        customerName: data.customer_name || 'Unknown Customer',
+        status: data.status,
+        items: data.order_items || [],
+        subtotal: data.subtotal,
+        tax: data.tax,
+        shipping: data.shipping,
+        total: data.total,
+        shippingAddress: data.shipping_address || {},
+        createdAt: data.created_at
+      };
     } catch (error) {
-      console.log('Error fetching order from API, using mock data');
+      console.error('Error fetching order from Supabase:', error);
       
-      // Fallback to mock data
-      const order = mockOrders.find(order => order.id === id);
-      
-      if (!order) {
-        throw new Error('Order not found');
+      // Fallback to API
+      try {
+        return await apiClient.get(`/orders/${id}`);
+      } catch (apiError) {
+        console.log('Error fetching order from API, using mock data');
+        
+        // Fallback to mock data
+        const order = mockOrders.find(order => order.id === id);
+        
+        if (!order) {
+          throw new Error('Order not found');
+        }
+        
+        return order;
       }
-      
-      return order;
     }
   },
   
   // Get orders for a specific customer
   async getCustomerOrders(customerId, params = {}) {
     try {
-      const allParams = {
-        ...params,
-        customerId
-      };
+      console.log('Fetching customer orders from Supabase:', customerId);
       
-      return await apiClient.get('/orders', allParams);
-    } catch (error) {
-      console.log('Error fetching customer orders from API, using mock data');
-      
-      // Fallback to mock data
       const { 
-        sortBy = 'createdAt',
+        page = 1, 
+        limit = 10, 
+        sortBy = 'created_at',
         sortOrder = 'desc'
       } = params;
       
-      let customerOrders = mockOrders.filter(order => order.customerId === customerId);
+      // Apply sorting - handle conversion from camelCase to snake_case
+      let dbSortBy = sortBy;
+      if (sortBy === 'createdAt') dbSortBy = 'created_at';
+      if (sortBy === 'updatedAt') dbSortBy = 'updated_at';
+      if (sortBy === 'userId') dbSortBy = 'user_id';
       
-      // Sort orders
-      customerOrders.sort((a, b) => {
-        if (sortOrder === 'asc') {
-          return a[sortBy] > b[sortBy] ? 1 : -1;
-        } else {
-          return a[sortBy] < b[sortBy] ? 1 : -1;
-        }
-      });
+      // Apply sorting
+      const ascending = sortOrder === 'asc';
+      
+      // Start query
+      let query = supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items(*)
+        `)
+        .eq('user_id', customerId)
+        .order(dbSortBy, { ascending });
+        
+      // Apply pagination if needed
+      if (limit > 0) {
+        const startRange = (page - 1) * limit;
+        const endRange = page * limit - 1;
+        query = query.range(startRange, endRange);
+      }
+      
+      // Execute query
+      const { data, error } = await query;
+      
+      if (error) throw error;
+      
+      // Format orders to match expected structure
+      const formattedOrders = data.map(order => ({
+        id: order.id,
+        customerId: order.user_id,
+        customerName: order.customer_name || 'Unknown Customer',
+        status: order.status,
+        items: order.order_items || [],
+        subtotal: order.subtotal,
+        tax: order.tax,
+        shipping: order.shipping,
+        total: order.total,
+        shippingAddress: order.shipping_address || {},
+        createdAt: order.created_at
+      }));
       
       return {
-        orders: customerOrders
+        orders: formattedOrders
       };
+    } catch (error) {
+      console.error('Error fetching customer orders from Supabase:', error);
+      
+      // Fallback to API
+      try {
+        const allParams = {
+          ...params,
+          customerId
+        };
+        
+        return await apiClient.get('/orders', allParams);
+      } catch (apiError) {
+        console.log('Error fetching customer orders from API, using mock data');
+        
+        // Fallback to mock data
+        const { 
+          sortBy = 'createdAt',
+          sortOrder = 'desc'
+        } = params;
+        
+        let customerOrders = mockOrders.filter(order => order.customerId === customerId);
+        
+        // Sort orders
+        customerOrders.sort((a, b) => {
+          if (sortOrder === 'asc') {
+            return a[sortBy] > b[sortBy] ? 1 : -1;
+          } else {
+            return a[sortBy] < b[sortBy] ? 1 : -1;
+          }
+        });
+        
+        return {
+          orders: customerOrders
+        };
+      }
     }
   },
   
   // Create a new order
   async createOrder(orderData) {
     try {
-      return await apiClient.post('/orders', orderData);
+      console.log('Creating order in Supabase');
+      
+      const { data: user } = await supabase.auth.getUser();
+      
+      if (!user.user) {
+        throw new Error('Not authenticated');
+      }
+      
+      // Extract order items for separate insert
+      const { items, shippingAddress, ...orderDetails } = orderData;
+      
+      // First create or get shipping address
+      let shippingAddressId = null;
+      if (shippingAddress) {
+        // Insert shipping address if provided
+        const { data: addressData, error: addressError } = await supabase
+          .from('shipping_addresses') // Assuming you have this table
+          .insert({
+            user_id: user.user.id,
+            street: shippingAddress.street,
+            city: shippingAddress.city,
+            state: shippingAddress.state,
+            zip_code: shippingAddress.zipCode,
+            country: shippingAddress.country
+          })
+          .select()
+          .single();
+          
+        if (addressError) throw addressError;
+        shippingAddressId = addressData.id;
+      }
+      
+      // Create the order record
+      const { data: newOrder, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          user_id: user.user.id,
+          status: 'Pending',
+          total_amount: orderData.total,
+          shipping_address_id: shippingAddressId,
+          created_at: new Date(),
+          updated_at: new Date()
+        })
+        .select()
+        .single();
+      
+      if (orderError) throw orderError;
+      
+      // Create order items linked to the order
+      if (items && items.length > 0) {
+        const orderItems = items.map(item => ({
+          order_id: newOrder.id,
+          product_id: item.productId,
+          product_name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          image_url: item.imageUrl
+        }));
+        
+        const { error: itemsError } = await supabase
+          .from('order_items')
+          .insert(orderItems);
+        
+        if (itemsError) throw itemsError;
+      }
+      
+      toast.success('Order created successfully');
+      return newOrder;
     } catch (error) {
-      console.error('Error creating order:', error);
-      throw error;
+      console.error('Error creating order in Supabase:', error);
+      toast.error('Failed to create order');
+      
+      // Fallback to API
+      try {
+        return await apiClient.post('/orders', orderData);
+      } catch (apiError) {
+        console.error('Error creating order via API:', apiError);
+        throw apiError;
+      }
     }
   },
   
   // Update an order's status
   async updateOrderStatus(id, status) {
     try {
-      return await apiClient.put(`/orders/${id}/status`, { status });
+      console.log('Updating order status in Supabase:', id, status);
+      
+      const { data, error } = await supabase
+        .from('orders')
+        .update({ status, updated_at: new Date() })
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      toast.success(`Order status updated to ${status}`);
+      return data;
     } catch (error) {
-      console.log('Error updating order status, simulating success');
+      console.error('Error updating order status in Supabase:', error);
       
-      // Update mock order
-      const orderIndex = mockOrders.findIndex(order => order.id === id);
-      if (orderIndex !== -1) {
-        mockOrders[orderIndex].status = status;
+      // Fallback to API
+      try {
+        return await apiClient.put(`/orders/${id}/status`, { status });
+      } catch (apiError) {
+        console.log('Error updating order status via API, simulating success');
+        
+        // Update mock order
+        const orderIndex = mockOrders.findIndex(order => order.id === id);
+        if (orderIndex !== -1) {
+          mockOrders[orderIndex].status = status;
+        }
+        
+        return { success: true };
       }
-      
-      return { success: true };
     }
   },
   
   // Get order statistics (for admin dashboard)
   async getOrderStats() {
     try {
-      return await apiClient.get('/orders/stats');
-    } catch (error) {
-      console.log('Error fetching order stats, using mock data');
+      console.log('Fetching order stats from Supabase');
       
-      // Calculate mock stats
-      const total = mockOrders.length;
-      const pending = mockOrders.filter(order => order.status === 'Pending').length;
-      const processing = mockOrders.filter(order => order.status === 'Processing').length;
-      const delivered = mockOrders.filter(order => order.status === 'Delivered').length;
-      const totalRevenue = mockOrders.reduce((sum, order) => sum + order.total, 0);
+      // Get total orders count
+      const { count: totalOrders, error: totalError } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true });
       
-      // Sort by date for recent orders
-      const recentOrders = [...mockOrders]
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-        .slice(0, 5);
+      if (totalError) throw totalError;
+      
+      // Get pending orders count
+      const { count: pending, error: pendingError } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'Pending');
+      
+      if (pendingError) throw pendingError;
+      
+      // Get processing orders count
+      const { count: processing, error: processingError } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'Processing');
+      
+      if (processingError) throw processingError;
+      
+      // Get delivered orders count
+      const { count: delivered, error: deliveredError } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'Delivered');
+      
+      if (deliveredError) throw deliveredError;
+      
+      // Get total revenue - use the total_amount column
+      const { data: revenueData, error: revenueError } = await supabase
+        .from('orders')
+        .select('total_amount');
+      
+      if (revenueError) throw revenueError;
+      
+      // Calculate total revenue from the total_amount column
+      const totalRevenue = revenueData.reduce((sum, order) => sum + (parseFloat(order.total_amount) || 0), 0);
+      
+      // Get recent orders
+      const { data: recentOrders, error: recentError } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          order_items(*)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(5);
+      
+      if (recentError) throw recentError;
+      
+      // Format recent orders
+      const formattedRecent = recentOrders.map(order => ({
+        id: order.id,
+        customerId: order.user_id,
+        customerName: order.customer_name || 'Unknown Customer',
+        status: order.status,
+        total: order.total,
+        createdAt: order.created_at
+      }));
       
       return {
-        totalOrders: total,
+        totalOrders,
         pending,
         processing,
         delivered,
         totalRevenue: parseFloat(totalRevenue.toFixed(2)),
-        recentOrders
+        recentOrders: formattedRecent
       };
+    } catch (error) {
+      console.error('Error fetching order stats from Supabase:', error);
+      
+      // Fallback to API
+      try {
+        return await apiClient.get('/orders/stats');
+      } catch (apiError) {
+        console.log('Error fetching order stats from API, using mock data');
+        
+        // Calculate mock stats
+        const total = mockOrders.length;
+        const pending = mockOrders.filter(order => order.status === 'Pending').length;
+        const processing = mockOrders.filter(order => order.status === 'Processing').length;
+        const delivered = mockOrders.filter(order => order.status === 'Delivered').length;
+        const totalRevenue = mockOrders.reduce((sum, order) => sum + order.total, 0);
+        
+        // Sort by date for recent orders
+        const recentOrders = [...mockOrders]
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+          .slice(0, 5);
+        
+        return {
+          totalOrders: total,
+          pending,
+          processing,
+          delivered,
+          totalRevenue: parseFloat(totalRevenue.toFixed(2)),
+          recentOrders
+        };
+      }
     }
   }
-}
+};

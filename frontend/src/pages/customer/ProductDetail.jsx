@@ -4,6 +4,7 @@ import { toast } from 'react-hot-toast'
 import { productService } from '../../services/productService'
 import { cartService } from '../../services/cartService'
 import { FiArrowLeft, FiShoppingCart } from 'react-icons/fi'
+import { supabase } from '../../utils/supabase'
 
 function ProductDetail() {
   const { id } = useParams()
@@ -79,6 +80,44 @@ function ProductDetail() {
     }
   }
   
+  // Debug function to inspect database tables
+  const debugDatabase = async () => {
+    try {
+      console.log('Debugging database structure...');
+      
+      // Check products table
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('*')
+        .limit(5);
+      
+      if (productsError) {
+        console.error('Error fetching products:', productsError);
+      } else {
+        console.log('Products table (sample):', products);
+        console.log('Product ID format sample:', products.length > 0 ? products[0].id : 'No products found');
+      }
+      
+      // Check cart_items table structure
+      const { data: cartItems, error: cartError } = await supabase
+        .from('cart_items')
+        .select('*')
+        .limit(5);
+      
+      if (cartError) {
+        console.error('Error fetching cart items:', cartError);
+      } else {
+        console.log('Cart items table (sample):', cartItems);
+      }
+      
+      // Log current product details
+      console.log('Current product being viewed:', product);
+      
+    } catch (error) {
+      console.error('Debug failed:', error);
+    }
+  };
+  
   if (isLoading) {
     return (
       <div className="animate-pulse">
@@ -117,6 +156,15 @@ function ProductDetail() {
       >
         <FiArrowLeft className="mr-1 h-5 w-5" />
         Back to products
+      </button>
+      
+      {/* Add debug button */}
+      <button
+        type="button"
+        className="inline-flex items-center mb-6 ml-4 text-sm font-medium text-blue-600 hover:text-blue-800"
+        onClick={debugDatabase}
+      >
+        Debug Database
       </button>
       
       <div className="grid grid-cols-1 gap-x-8 gap-y-10 lg:grid-cols-2">

@@ -69,26 +69,44 @@ export const cartService = {
         throw new Error('Not authenticated');
       }
       
+      console.log('Current user ID:', user.user.id);
+      
       // Check if product exists in the database first
       const { data: productExists, error: productCheckError } = await supabase
         .from('products')
-        .select('id')
+        .select('id, name')
         .eq('id', productId)
         .single();
         
-      if (productCheckError || !productExists) {
-        console.error('Product does not exist:', productCheckError);
+      if (productCheckError) {
+        console.error('Error checking product:', productCheckError);
+        if (productCheckError.code === 'PGRST116') {
+          console.log('Product not found with ID:', productId);
+        }
         toast.error('Product not found in database');
+        throw new Error('Product check failed');
+      }
+      
+      if (!productExists) {
+        console.log('Product exists check failed for ID:', productId);
+        toast.error('Product not found');
         throw new Error('Product not found');
       }
       
+      console.log('Product found:', productExists);
+      
       // Check if product already in cart
-      const { data: existingItem } = await supabase
+      const { data: existingItem, error: existingItemError } = await supabase
         .from('cart_items')
         .select('id, quantity')
         .eq('user_id', user.user.id)
         .eq('product_id', productId)
         .single();
+      
+      if (existingItemError && existingItemError.code !== 'PGRST116') {
+        console.error('Error checking cart:', existingItemError);
+        throw existingItemError;
+      }
       
       if (existingItem) {
         // Update quantity if already in cart
