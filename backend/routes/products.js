@@ -29,6 +29,11 @@ router.get('/', productController.getProducts);
 // @access  Public
 router.get('/top', productController.getTopProducts);
 
+// @route   GET /api/products/categories
+// @desc    Get all unique product categories
+// @access  Public
+router.get('/categories', productController.getProductCategories);
+
 // @route   GET /api/products/:id
 // @desc    Get product by ID or slug
 // @access  Public

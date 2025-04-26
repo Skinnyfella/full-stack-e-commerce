@@ -34,8 +34,12 @@ function ProductForm() {
           const product = await productService.getProductById(id)
           setFormData({
             ...product,
-            price: product.price.toString(),
-            inventory: product.inventory.toString(),
+            price: typeof product.price === 'number' 
+              ? product.price.toString() 
+              : (parseFloat(product.price) || 0).toString(),
+            inventory: typeof product.inventory === 'number'
+              ? product.inventory.toString()
+              : (parseInt(product.inventory) || 0).toString(),
           })
         } catch (error) {
           console.error('Error loading product:', error)

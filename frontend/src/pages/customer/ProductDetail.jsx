@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
 import { productService } from '../../services/productService'
+import { cartService } from '../../services/cartService'
 import { FiArrowLeft, FiShoppingCart } from 'react-icons/fi'
 
 function ProductDetail() {
@@ -53,10 +54,15 @@ function ProductDetail() {
   }
   
   // Handle add to cart
-  const handleAddToCart = () => {
-    // In a real app, this would dispatch an action to add to cart
-    // For now, we'll just show a toast
-    toast.success(`Added ${quantity} ${quantity === 1 ? 'item' : 'items'} to your cart`)
+  const handleAddToCart = async () => {
+    try {
+      console.log('Attempting to add product with ID:', product.id);
+      await cartService.addToCart(product.id, quantity);
+      // Toast is handled within cartService
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      // Toast error is already handled in the service
+    }
   }
   
   // Function to get status badge with the right color
@@ -134,7 +140,9 @@ function ProductDetail() {
           <div className="mt-4 flex items-center">
             <h2 className="sr-only">Product information</h2>
             <p className="text-3xl tracking-tight text-gray-900">
-              ${product.price.toFixed(2)}
+              ${typeof product.price === 'number' 
+                ? product.price.toFixed(2) 
+                : (parseFloat(product.price) || 0).toFixed(2)}
             </p>
             
             <div className="ml-4">

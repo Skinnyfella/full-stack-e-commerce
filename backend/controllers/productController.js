@@ -372,6 +372,29 @@ const getTopProducts = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Get all unique product categories
+ * @route   GET /api/products/categories
+ * @access  Public
+ */
+const getProductCategories = async (req, res) => {
+  try {
+    // Get all categories
+    const categories = await db.Category.findAll({
+      attributes: ['name'],
+      order: [['name', 'ASC']]
+    });
+    
+    // Extract category names and send as array
+    const categoryNames = categories.map(category => category.name);
+    
+    res.json(categoryNames);
+  } catch (error) {
+    console.error('Error fetching product categories:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   getProducts,
   getProductById,
@@ -379,5 +402,6 @@ module.exports = {
   updateProduct,
   deleteProduct,
   uploadProductImage,
-  getTopProducts
+  getTopProducts,
+  getProductCategories
 }; 

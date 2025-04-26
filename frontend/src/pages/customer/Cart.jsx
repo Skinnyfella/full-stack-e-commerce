@@ -4,24 +4,7 @@ import { FiShoppingBag, FiTrash2 } from 'react-icons/fi'
 import { toast } from 'react-hot-toast'
 import PageHeader from '../../components/common/PageHeader'
 import EmptyState from '../../components/common/EmptyState'
-
-// Mock cart data - in a real app, this would come from a store or context
-const initialCartItems = [
-  {
-    id: '1',
-    name: 'Product 1',
-    price: 19.99,
-    quantity: 2,
-    imageUrl: 'https://picsum.photos/seed/product1/400/300',
-  },
-  {
-    id: '2',
-    name: 'Product 2',
-    price: 29.99,
-    quantity: 1,
-    imageUrl: 'https://picsum.photos/seed/product2/400/300',
-  }
-]
+import { cartService } from '../../services/cartService'
 
 function CartItem({ item, updateQuantity, removeItem }) {
   const handleQuantityChange = (e) => {
@@ -114,7 +97,7 @@ function CartItem({ item, updateQuantity, removeItem }) {
 
 function CartSummary({ cartItems }) {
   // Calculate totals
-  const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+  const subtotal = cartItems.reduce((sum, item) => sum + (parseFloat(item.product.price) * item.quantity), 0)
   const shipping = 10 // Fixed shipping cost for demo
   const tax = subtotal * 0.08 // 8% tax rate for demo
   const total = subtotal + tax + shipping
@@ -170,38 +153,62 @@ function Cart() {
   const [cartItems, setCartItems] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   
-  // Load cart items (would come from a store or context in a real app)
+  // Load cart items from Supabase
   useEffect(() => {
-    // Simulate loading from an API
-    const timer = setTimeout(() => {
-      setCartItems(initialCartItems)
-      setIsLoading(false)
-    }, 500)
+    async function loadCartItems() {
+      try {
+        setIsLoading(true)
+        const cart = await cartService.getCartItems()
+        setCartItems(cart.items)
+      } catch (error) {
+        console.error('Error loading cart:', error)
+        toast.error('Failed to load cart items')
+      } finally {
+        setIsLoading(false)
+      }
+    }
     
-    return () => clearTimeout(timer)
+    loadCartItems()
   }, [])
   
   // Update quantity of an item
-  const updateQuantity = (id, quantity) => {
-    setCartItems(
-      cartItems.map(item => 
-        item.id === id ? { ...item, quantity } : item
-      )
-    )
-    toast.success('Cart updated')
+  const updateQuantity = async (id, quantity) => {
+    try {
+      setIsLoading(true)
+      const cart = await cartService.updateCartItem(id, quantity)
+      setCartItems(cart.items)
+    } catch (error) {
+      console.error('Error updating cart:', error)
+    } finally {
+      setIsLoading(false)
+    }
   }
   
   // Remove an item from cart
-  const removeItem = (id) => {
-    setCartItems(cartItems.filter(item => item.id !== id))
-    toast.success('Item removed from cart')
+  const removeItem = async (id) => {
+    try {
+      setIsLoading(true)
+      const cart = await cartService.removeFromCart(id)
+      setCartItems(cart.items)
+    } catch (error) {
+      console.error('Error removing item from cart:', error)
+    } finally {
+      setIsLoading(false)
+    }
   }
   
   // Clear entire cart
-  const clearCart = () => {
+  const clearCart = async () => {
     if (window.confirm('Are you sure you want to clear your cart?')) {
-      setCartItems([])
-      toast.success('Cart cleared')
+      try {
+        setIsLoading(true)
+        const cart = await cartService.clearCart()
+        setCartItems(cart.items)
+      } catch (error) {
+        console.error('Error clearing cart:', error)
+      } finally {
+        setIsLoading(false)
+      }
     }
   }
   
@@ -255,9 +262,15 @@ function Cart() {
               
               <ul className="divide-y divide-gray-200">
                 {cartItems.map(item => (
-                  <CartItem 
-                    key={item.id} 
-                    item={item}
+                  <CartItem
+                    key={item.id}
+                    item={{
+                      id: item.id,
+                      name: item.product.name,
+                      price: parseFloat(item.product.price),
+                      quantity: item.quantity,
+                      imageUrl: item.product.imageUrl
+                    }}
                     updateQuantity={updateQuantity}
                     removeItem={removeItem}
                   />
