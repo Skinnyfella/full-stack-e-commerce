@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Debug Page</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2.39.7/dist/umd/supabase.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    h1 {
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 10px;
+    }
+    pre {
+      background: #f4f4f4;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    .success {
+      color: green;
+      font-weight: bold;
+    }
+    .error {
+      color: red;
+      font-weight: bold;
+    }
+    button {
+      padding: 10px 15px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    #log {
+      margin-top: 20px;
+      background: #f9f9f9;
+      padding: 10px;
+      border-radius: 4px;
+      min-height: 200px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Supabase Connection Debugger</h1>
+  
+  <h2>Configuration</h2>
+  <p>Make sure these match your .env file:</p>
+  
+  <div>
+    <label for="supabaseUrl">Supabase URL:</label>
+    <input type="text" id="supabaseUrl" value="https://ctroctaivkvumwmllnfq.supabase.co" style="width: 400px;"/>
+  </div>
+  
+  <div style="margin-top: 10px;">
+    <label for="supabaseKey">Supabase Anon Key:</label>
+    <input type="text" id="supabaseKey" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN0cm9jdGFpdmt2dW13bWxsbmZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU0MDYyNDEsImV4cCI6MjA2MDk4MjI0MX0.yCH6dsqPNd9BEHhOZA0Y5uHxnc1ymSLkAqLhX4gjU9Q" style="width: 400px;"/>
+  </div>
+  
+  <button id="testConnection">Test Supabase Connection</button>
+  
+  <div id="log"></div>
+  
+  <script>
+    document.getElementById('testConnection').addEventListener('click', async function() {
+      const logElement = document.getElementById('log');
+      logElement.innerHTML = '<p>Testing connection...</p>';
+      
+      try {
+        const supabaseUrl = document.getElementById('supabaseUrl').value;
+        const supabaseKey = document.getElementById('supabaseKey').value;
+        
+        if (!supabaseUrl || !supabaseKey) {
+          throw new Error('Supabase URL and Anon Key are required');
+        }
+        
+        // Initialize Supabase client
+        const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+        
+        // Test connection by trying to access public data
+        logElement.innerHTML += '<p>Initialized Supabase client</p>';
+        
+        // Try to ping Supabase
+        const { data, error } = await supabaseClient.from('user_profiles').select('count', { count: 'exact', head: true });
+        
+        if (error) {
+          throw new Error(`Supabase query error: ${error.message}`);
+        }
+        
+        logElement.innerHTML += '<p class="success">✅ Successfully connected to Supabase!</p>';
+        logElement.innerHTML += `<pre>${JSON.stringify({ data }, null, 2)}</pre>`;
+        
+      } catch (error) {
+        logElement.innerHTML += `<p class="error">❌ Error: ${error.message}</p>`;
+        console.error('Connection error:', error);
+      }
+    });
+  </script>
+</body>
+</html> 
