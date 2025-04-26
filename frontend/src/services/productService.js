@@ -163,7 +163,7 @@ export const productService = {
           name: 'Product Not Available',
           description: 'This product is no longer available.',
           price: 0,
-          imageUrl: 'https://via.placeholder.com/400x300?text=Product+Not+Available',
+          imageUrl: 'https://placehold.co/400x300?text=Not+Available',
           inventory: 0,
           sku: 'UNAVAILABLE',
           status: 'Out of Stock',
@@ -204,7 +204,7 @@ export const productService = {
             name: 'Product Not Available',
             description: 'This product is no longer available.',
             price: 0,
-            imageUrl: 'https://via.placeholder.com/400x300?text=Product+Not+Available',
+            imageUrl: 'https://placehold.co/400x300?text=Not+Available',
             inventory: 0,
             sku: 'UNAVAILABLE',
             status: 'Out of Stock',
@@ -228,7 +228,7 @@ export const productService = {
             name: 'Product Not Available',
             description: 'This product is no longer available.',
             price: 0,
-            imageUrl: 'https://via.placeholder.com/400x300?text=Product+Not+Available',
+            imageUrl: 'https://placehold.co/400x300?text=Not+Available',
             inventory: 0,
             sku: 'UNAVAILABLE',
             status: 'Out of Stock',
@@ -250,7 +250,7 @@ export const productService = {
           name: 'Product Not Available',
           description: 'This product is no longer available.',
           price: 0,
-          imageUrl: 'https://via.placeholder.com/400x300?text=Product+Not+Available',
+          imageUrl: 'https://placehold.co/400x300?text=Not+Available',
           inventory: 0,
           sku: 'UNAVAILABLE',
           status: 'Out of Stock',
@@ -285,10 +285,31 @@ export const productService = {
   // Delete a product
   async deleteProduct(id) {
     try {
-      return await apiClient.delete(`/products/${id}`);
-    } catch (error) {
-      console.error('Error deleting product:', error);
-      throw error;
+      console.log('Deleting product from Supabase:', id);
+      
+      // First try Supabase delete
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', id);
+      
+      if (error) {
+        console.error('Error deleting product from Supabase:', error);
+        throw error;
+      }
+      
+      console.log('Product successfully deleted from Supabase');
+      return { success: true };
+    } catch (supabaseError) {
+      console.error('Supabase delete failed, trying API:', supabaseError);
+      
+      // Fallback to API
+      try {
+        return await apiClient.delete(`/products/${id}`);
+      } catch (error) {
+        console.error('Error deleting product:', error);
+        throw error;
+      }
     }
   },
   

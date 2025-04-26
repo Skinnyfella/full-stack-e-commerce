@@ -28,21 +28,52 @@ function ProductList() {
   const loadProducts = async (page = 1) => {
     setIsLoading(true)
     try {
-      const data = await productService.getProducts({
-        page,
-        limit: pagination.limit,
-        ...searchParams
+      // Use direct Supabase connection instead of the API fallback
+      const data = await productService.getSupabaseProducts()
+      
+      // Extract and filter products based on search parameters
+      let filteredProducts = [...(data.products || [])]
+      
+      // Apply search filter
+      if (searchParams.search) {
+        const searchLower = searchParams.search.toLowerCase()
+        filteredProducts = filteredProducts.filter(product => 
+          product.name.toLowerCase().includes(searchLower) || 
+          (product.description && product.description.toLowerCase().includes(searchLower)) ||
+          (product.sku && product.sku.toLowerCase().includes(searchLower))
+        )
+      }
+      
+      // Apply category filter
+      if (searchParams.category) {
+        filteredProducts = filteredProducts.filter(product => 
+          product.category === searchParams.category
+        )
+      }
+      
+      // Apply sorting
+      filteredProducts.sort((a, b) => {
+        if (searchParams.sortOrder === 'asc') {
+          return a[searchParams.sortBy] > b[searchParams.sortBy] ? 1 : -1
+        } else {
+          return a[searchParams.sortBy] < b[searchParams.sortBy] ? 1 : -1
+        }
       })
       
-      setProducts(data.products || [])
+      // Apply pagination
+      const startIndex = (page - 1) * pagination.limit
+      const endIndex = page * pagination.limit
+      const paginatedProducts = filteredProducts.slice(startIndex, endIndex)
+      
+      setProducts(paginatedProducts)
       setPagination({
         page: page,
         limit: pagination.limit,
-        total: data.pagination?.total || 0,
-        totalPages: data.pagination?.totalPages || 0
+        total: filteredProducts.length,
+        totalPages: Math.ceil(filteredProducts.length / pagination.limit)
       })
     } catch (error) {
-      console.error('Error loading products:', error)
+      console.error('Error loading products from Supabase:', error)
       toast.error('Failed to load products')
       setProducts([])
     } finally {
