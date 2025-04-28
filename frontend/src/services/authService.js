@@ -3,6 +3,13 @@
 
 import { supabase } from '../utils/supabase';
 
+// Get admin email from environment variables
+const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
+
+if (!ADMIN_EMAIL) {
+  console.warn('Admin email not configured in environment variables');
+}
+
 // Mock user database for demo purposes
 const mockUsers = [
   {
@@ -30,26 +37,48 @@ const enhanceUserWithRole = async (user) => {
   if (!user) return null;
   
   try {
-    // First check if user has role in their metadata
-    if (user.user_metadata && user.user_metadata.role) {
-      return {
-        ...user,
-        role: user.user_metadata.role
-      };
-    }
+    // Check if the user is admin by email
+    const isAdminEmail = user.email === ADMIN_EMAIL;
     
-    // Fallback to fetching from user_profiles table
+    // Fetch user profile from database
     const { data: profile, error } = await supabase
       .from('user_profiles')
-      .select('role')
+      .select('*')
       .eq('id', user.id)
       .single();
     
-    if (error || !profile) {
-      console.warn('No role found, defaulting to customer role');
+    if (error) {
+      console.error('Error fetching user profile:', error);
       return {
         ...user,
-        role: 'customer'  // Default role
+        role: isAdminEmail ? 'admin' : 'customer'
+      };
+    }
+    
+    if (!profile) {
+      console.warn('No profile found, creating one with appropriate role');
+      
+      // Create a profile for this user
+      try {
+        const { error: insertError } = await supabase
+          .from('user_profiles')
+          .insert([{
+            id: user.id,
+            email: user.email,
+            name: user.user_metadata?.name || '',
+            role: isAdminEmail ? 'admin' : 'customer'
+          }]);
+          
+        if (insertError) {
+          console.error('Failed to create user profile:', insertError);
+        }
+      } catch (insertErr) {
+        console.error('Exception creating profile:', insertErr);
+      }
+      
+      return {
+        ...user,
+        role: isAdminEmail ? 'admin' : 'customer'
       };
     }
     
@@ -59,43 +88,16 @@ const enhanceUserWithRole = async (user) => {
     };
   } catch (error) {
     console.error('Error enhancing user with role:', error);
-    // Fallback to a default role
     return {
       ...user,
-      role: 'customer'
+      role: user.email === ADMIN_EMAIL ? 'admin' : 'customer'
     };
   }
 };
 
 export const authService = {
-  // Login with email and password using Supabase
+  // Login with email and password
   async login(email, password) {
-    // For demo purposes only - allow direct login to demo accounts
-    if (
-      (email === 'admin@example.com' && password === 'admin123') ||
-      (email === 'customer@example.com' && password === 'customer123')
-    ) {
-      await delay(500); // Simulate API delay
-      
-      // Mock response for demo accounts
-      if (email === 'admin@example.com') {
-        return {
-          id: '1',
-          email: 'admin@example.com',
-          role: 'admin',
-          name: 'Admin User'
-        };
-      } else {
-        return {
-          id: '2',
-          email: 'customer@example.com',
-          role: 'customer',
-          name: 'John Customer'
-        };
-      }
-    }
-    
-    // Use Supabase Auth for real authentication
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
@@ -105,21 +107,15 @@ export const authService = {
       throw new Error(error.message);
     }
     
-    // Enhance user with role information
     return await enhanceUserWithRole(data.user);
   },
   
-  // Register a new user using Supabase
-  async register({ email, password, name }) {
-    // Use Supabase Auth
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
+  // Login with Google
+  async loginWithGoogle() {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
       options: {
-        data: {
-          name,
-          role: 'customer' // Default role for new users
-        }
+        redirectTo: window.location.origin
       }
     });
     
@@ -127,37 +123,45 @@ export const authService = {
       throw new Error(error.message);
     }
     
-    // Create a profile entry for the new user
-    if (data.user) {
-      try {
-        await supabase.from('user_profiles').insert([
-          {
-            id: data.user.id,
-            email: data.user.email,
-            name: name || '',
-            role: 'customer'
-          }
-        ]);
-      } catch (profileError) {
-        console.error('Error creating user profile:', profileError);
-      }
-    }
-    
-    // Add role to user data
-    return {
-      ...data.user,
-      role: 'customer'
-    };
+    // This may not return user data immediately due to the redirect
+    console.log('Google auth initiated, redirecting...');
+    return data;
   },
   
-  // Sign out
+  // Register a new user
+  async register({ email, password, name }) {
+    const isAdmin = email === ADMIN_EMAIL;
+    
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          name,
+          role: isAdmin ? 'admin' : 'customer'
+        }
+      }
+    });
+    
+    if (error) {
+      console.error('Registration error:', error);
+      throw new Error(error.message);
+    }
+
+    if (!data.user) {
+      throw new Error('User creation failed');
+    }
+
+    // Profile will be created by the database trigger
+    return await enhanceUserWithRole(data.user);
+  },
+  
+  // Logout
   async logout() {
     const { error } = await supabase.auth.signOut();
-    
     if (error) {
       throw new Error(error.message);
     }
-    
     return true;
   },
   
@@ -169,7 +173,6 @@ export const authService = {
       return null;
     }
     
-    // Enhance user with role information
     return await enhanceUserWithRole(session.user);
   },
   

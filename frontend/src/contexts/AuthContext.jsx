@@ -44,6 +44,21 @@ export function AuthProvider({ children }) {
     }
   }, [])
   
+  // Google login function
+  const loginWithGoogle = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const userData = await authService.loginWithGoogle()
+      setUser(userData)
+      return { success: true, user: userData }
+    } catch (error) {
+      console.error('Google login failed:', error)
+      return { success: false, error: error.message || 'Google login failed' }
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+  
   // Register function
   const register = useCallback(async (userData) => {
     setIsLoading(true)
@@ -78,10 +93,11 @@ export function AuthProvider({ children }) {
     isLoading,
     checkAuth,
     login,
+    loginWithGoogle,
     register,
     logout,
     isAuthenticated: !!user,
-  }), [user, isLoading, checkAuth, login, register, logout])
+  }), [user, isLoading, checkAuth, login, loginWithGoogle, register, logout])
   
   return (
     <AuthContext.Provider value={contextValue}>
