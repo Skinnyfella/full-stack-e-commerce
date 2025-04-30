@@ -14,18 +14,10 @@ function ProductCard({ product }) {
     inventory: product?.inventory || 0,
     description: product?.description || 'No description available',
     imageUrl: product?.imageUrl || 'https://placehold.co/400x300?text=No+Image',
+    status: product?.status || 'Out of Stock',
     ...product
   }
 
-  // Calculate status based on inventory
-  const calculateStatus = (inventory) => {
-    if (!inventory || inventory === 0) return 'Out of Stock';
-    if (inventory <= 20) return 'Low Stock';
-    return 'In Stock';
-  };
-  
-  const status = calculateStatus(safeProduct.inventory);
-  
   const handleClick = () => {
     if (isAdmin) {
       navigate(`/admin/products/edit/${safeProduct.id}`)
@@ -36,7 +28,7 @@ function ProductCard({ product }) {
   
   // Function to show product status with the right color
   const getStatusBadge = () => {
-    switch(status) {
+    switch(safeProduct.status) {
       case 'In Stock':
         return <span className="badge badge-success">In Stock ({safeProduct.inventory})</span>
       case 'Low Stock':
@@ -57,30 +49,27 @@ function ProductCard({ product }) {
     }
     return '0.00';
   };
-  
+
   return (
     <div 
-      className="card transition-transform duration-200 hover:shadow-lg cursor-pointer overflow-hidden"
+      className="relative flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white"
       onClick={handleClick}
     >
-      <div className="aspect-w-3 aspect-h-2 w-full overflow-hidden bg-gray-200">
-        <img 
-          src={safeProduct.imageUrl} 
+      <div className="aspect-h-4 aspect-w-3 bg-gray-200 sm:aspect-none group-hover:opacity-75 sm:h-96">
+        <img
+          src={safeProduct.imageUrl}
           alt={safeProduct.name}
-          className="h-48 w-full object-cover transition-transform hover:scale-105 duration-200"
-          onError={(e) => {
-            e.target.src = 'https://placehold.co/400x300?text=No+Image';
-          }}
+          className="h-full w-full object-cover object-center sm:h-full sm:w-full"
         />
       </div>
-      <div className="p-4">
-        <h3 className="text-lg font-medium text-gray-900 truncate">
+      <div className="flex flex-1 flex-col space-y-2 p-4">
+        <h3 className="text-sm font-medium text-gray-900">
           {safeProduct.name}
         </h3>
-        <div className="mt-1 flex justify-between items-center">
-          <p className="text-lg font-medium text-gray-900">${formatPrice(safeProduct.price)}</p>
-          {getStatusBadge()}
-        </div>
+        <p className="text-base font-medium text-gray-900">
+          ${formatPrice(safeProduct.price)}
+        </p>
+        {getStatusBadge()}
         <p className="mt-2 text-sm text-gray-500 line-clamp-2">
           {safeProduct.description}
         </p>
@@ -91,10 +80,10 @@ function ProductCard({ product }) {
             </button>
           ) : (
             <button 
-              className={`btn-primary w-full ${status === 'Out of Stock' ? 'opacity-50 cursor-not-allowed' : ''}`}
-              disabled={status === 'Out of Stock'}
+              className={`btn-primary w-full ${safeProduct.status === 'Out of Stock' ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={safeProduct.status === 'Out of Stock'}
             >
-              {status === 'Out of Stock' ? 'Out of Stock' : 'View Details'}
+              {safeProduct.status === 'Out of Stock' ? 'Out of Stock' : 'View Details'}
             </button>
           )}
         </div>
