@@ -1,6 +1,13 @@
 import { supabase } from '../utils/supabase';
 import { toast } from 'react-hot-toast';
 
+// Calculate product status based on stock quantity
+const calculateProductStatus = (stock) => {
+  if (!stock || stock === 0) return 'Out of Stock';
+  if (stock <= 20) return 'Low Stock';
+  return 'In Stock';
+};
+
 export const cartService = {
   // Get all cart items for the current user
   async getCartItems() {
@@ -21,9 +28,8 @@ export const cartService = {
             id, 
             name, 
             price, 
-            image_url, 
-            inventory,
-            sku,
+            image_url,
+            stock_quantity,
             description
           )
         `)
@@ -32,7 +38,7 @@ export const cartService = {
       if (error) throw error;
       
       // Format data for frontend use
-      const formattedItems = data.map(item => ({
+      const formattedItems = (data || []).map(item => ({
         id: item.id,
         quantity: item.quantity,
         product: {
@@ -40,8 +46,8 @@ export const cartService = {
           name: item.product.name,
           price: item.product.price,
           imageUrl: item.product.image_url,
-          inventory: item.product.inventory,
-          sku: item.product.sku,
+          inventory: item.product.stock_quantity || 0,
+          status: calculateProductStatus(item.product.stock_quantity),
           description: item.product.description
         }
       }));
@@ -61,39 +67,35 @@ export const cartService = {
   // Add an item to the cart
   async addToCart(productId, quantity = 1) {
     try {
-      console.log('Adding product to cart:', { productId, quantity });
-      
       const { data: user } = await supabase.auth.getUser();
       
       if (!user.user) {
         throw new Error('Not authenticated');
       }
       
-      console.log('Current user ID:', user.user.id);
-      
-      // Check if product exists in the database first
-      const { data: productExists, error: productCheckError } = await supabase
+      // Check if product exists and has stock
+      const { data: product, error: productError } = await supabase
         .from('products')
-        .select('id, name')
+        .select('id, name, stock_quantity')
         .eq('id', productId)
         .single();
-        
-      if (productCheckError) {
-        console.error('Error checking product:', productCheckError);
-        if (productCheckError.code === 'PGRST116') {
-          console.log('Product not found with ID:', productId);
-        }
-        toast.error('Product not found in database');
+      
+      if (productError) {
+        console.error('Error checking product:', productError);
+        toast.error('Product not found');
         throw new Error('Product check failed');
       }
       
-      if (!productExists) {
-        console.log('Product exists check failed for ID:', productId);
+      if (!product) {
         toast.error('Product not found');
         throw new Error('Product not found');
       }
       
-      console.log('Product found:', productExists);
+      // Check stock quantity
+      if (product.stock_quantity < quantity) {
+        toast.error(`Only ${product.stock_quantity} items available`);
+        throw new Error('Insufficient stock');
+      }
       
       // Check if product already in cart
       const { data: existingItem, error: existingItemError } = await supabase
@@ -104,16 +106,22 @@ export const cartService = {
         .single();
       
       if (existingItemError && existingItemError.code !== 'PGRST116') {
-        console.error('Error checking cart:', existingItemError);
         throw existingItemError;
       }
       
       if (existingItem) {
+        // Check if new total quantity exceeds stock
+        const newQuantity = existingItem.quantity + quantity;
+        if (newQuantity > product.stock_quantity) {
+          toast.error(`Cannot add more. Only ${product.stock_quantity} items available`);
+          throw new Error('Insufficient stock');
+        }
+        
         // Update quantity if already in cart
         const { error } = await supabase
           .from('cart_items')
           .update({ 
-            quantity: existingItem.quantity + quantity,
+            quantity: newQuantity,
             updated_at: new Date()
           })
           .eq('id', existingItem.id);
@@ -136,7 +144,9 @@ export const cartService = {
       return await this.getCartItems();
     } catch (error) {
       console.error('Error adding to cart:', error);
-      toast.error('Failed to add item to cart');
+      if (!error.message?.includes('stock')) {
+        toast.error('Failed to add item to cart');
+      }
       throw error;
     }
   },
@@ -148,6 +158,29 @@ export const cartService = {
       
       if (!user.user) {
         throw new Error('Not authenticated');
+      }
+      
+      // Get current cart item to check product stock
+      const { data: cartItem, error: cartError } = await supabase
+        .from('cart_items')
+        .select('product_id')
+        .eq('id', cartItemId)
+        .single();
+        
+      if (cartError) throw cartError;
+      
+      // Check product stock
+      const { data: product, error: productError } = await supabase
+        .from('products')
+        .select('stock_quantity')
+        .eq('id', cartItem.product_id)
+        .single();
+        
+      if (productError) throw productError;
+      
+      if (quantity > product.stock_quantity) {
+        toast.error(`Only ${product.stock_quantity} items available`);
+        throw new Error('Insufficient stock');
       }
       
       // Update quantity
@@ -162,10 +195,13 @@ export const cartService = {
       
       if (error) throw error;
       
+      toast.success('Cart updated');
       return await this.getCartItems();
     } catch (error) {
       console.error('Error updating cart item:', error);
-      toast.error('Failed to update cart');
+      if (!error.message?.includes('stock')) {
+        toast.error('Failed to update cart');
+      }
       throw error;
     }
   },
@@ -222,4 +258,4 @@ export const cartService = {
       throw error;
     }
   }
-}; 
+};
