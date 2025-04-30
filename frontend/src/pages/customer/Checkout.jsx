@@ -2,29 +2,12 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
 import { orderService } from '../../services/orderService'
+import { useCart } from '../../contexts/CartContext'
 import PageHeader from '../../components/common/PageHeader'
-
-// Mock cart data - in a real app, this would come from a store or context
-const cartItems = [
-  {
-    id: '1',
-    name: 'Product 1',
-    price: 19.99,
-    quantity: 2,
-    imageUrl: 'https://picsum.photos/seed/product1/400/300',
-  },
-  {
-    id: '2',
-    name: 'Product 2',
-    price: 29.99,
-    quantity: 1,
-    imageUrl: 'https://picsum.photos/seed/product2/400/300',
-  }
-]
 
 function OrderSummary({ cartItems }) {
   // Calculate totals
-  const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+  const subtotal = cartItems.reduce((sum, item) => sum + (parseFloat(item.product.price) * item.quantity), 0)
   const shipping = 10 // Fixed shipping cost for demo
   const tax = subtotal * 0.08 // 8% tax rate for demo
   const total = subtotal + tax + shipping
@@ -38,15 +21,15 @@ function OrderSummary({ cartItems }) {
           <li key={item.id} className="flex py-4">
             <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-md border border-gray-200">
               <img
-                src={item.imageUrl}
-                alt={item.name}
+                src={item.product.imageUrl}
+                alt={item.product.name}
                 className="h-full w-full object-cover object-center"
               />
             </div>
             <div className="ml-4 flex flex-1 flex-col">
               <div className="flex justify-between text-base font-medium text-gray-900">
-                <h3>{item.name}</h3>
-                <p className="ml-4">${(item.price * item.quantity).toFixed(2)}</p>
+                <h3>{item.product.name}</h3>
+                <p className="ml-4">${(parseFloat(item.product.price) * item.quantity).toFixed(2)}</p>
               </div>
               <p className="mt-1 text-sm text-gray-500">Qty {item.quantity}</p>
             </div>
@@ -81,7 +64,8 @@ function OrderSummary({ cartItems }) {
 
 function Checkout() {
   const navigate = useNavigate()
-  
+  const { cart, clearCart } = useCart()
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -93,54 +77,68 @@ function Checkout() {
     cardName: '',
     cardNumber: '',
     expDate: '',
-    cvv: '',
+    cvv: ''
   })
-  
   const [errors, setErrors] = useState({})
-  const [isSubmitting, setIsSubmitting] = useState(false)
   
-  // Handle form changes
   const handleChange = (e) => {
     const { name, value } = e.target
-    setFormData({
-      ...formData,
-      [name]: value,
-    })
-    
-    // Clear error when field is updated
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }))
+    // Clear error when field is edited
     if (errors[name]) {
-      setErrors({
-        ...errors,
-        [name]: null,
-      })
+      setErrors(prev => ({
+        ...prev,
+        [name]: ''
+      }))
     }
   }
   
-  // Validate form
-  const validate = () => {
+  const validateForm = () => {
     const newErrors = {}
     
-    // Basic validation, would be more complex in a real app
-    if (!formData.name) newErrors.name = 'Name is required'
-    if (!formData.email) newErrors.email = 'Email is required'
-    if (!formData.address) newErrors.address = 'Address is required'
-    if (!formData.city) newErrors.city = 'City is required'
-    if (!formData.state) newErrors.state = 'State is required'
-    if (!formData.zipCode) newErrors.zipCode = 'ZIP Code is required'
-    if (!formData.cardName) newErrors.cardName = 'Name on card is required'
-    if (!formData.cardNumber) newErrors.cardNumber = 'Card number is required'
-    if (!formData.expDate) newErrors.expDate = 'Expiration date is required'
-    if (!formData.cvv) newErrors.cvv = 'CVV is required'
+    // Required fields
+    ;['name', 'email', 'address', 'city', 'state', 'zipCode', 'cardName', 'cardNumber', 'expDate', 'cvv'].forEach(field => {
+      if (!formData[field].trim()) {
+        newErrors[field] = 'This field is required'
+      }
+    })
+    
+    // Email validation
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Invalid email address'
+    }
+    
+    // Card number validation (basic)
+    if (formData.cardNumber && !/^\d{16}$/.test(formData.cardNumber.replace(/\s/g, ''))) {
+      newErrors.cardNumber = 'Invalid card number'
+    }
+    
+    // Expiry date validation (MM/YY format)
+    if (formData.expDate && !/^\d{2}\/\d{2}$/.test(formData.expDate)) {
+      newErrors.expDate = 'Invalid format (MM/YY)'
+    }
+    
+    // CVV validation
+    if (formData.cvv && !/^\d{3,4}$/.test(formData.cvv)) {
+      newErrors.cvv = 'Invalid CVV'
+    }
     
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
   
-  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault()
     
-    if (!validate()) {
+    if (!validateForm()) {
+      return
+    }
+    
+    if (cart.items.length === 0) {
+      toast.error('Your cart is empty')
       return
     }
     
@@ -148,21 +146,20 @@ function Checkout() {
     
     try {
       // Calculate totals (same as in OrderSummary)
-      const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+      const subtotal = cart.items.reduce((sum, item) => 
+        sum + (parseFloat(item.product.price) * item.quantity), 0)
       const shipping = 10
       const tax = subtotal * 0.08
       const total = subtotal + tax + shipping
       
-      // Create an order
+      // Create order data
       const orderData = {
-        customerId: '2', // Hardcoded for demo
-        customerName: formData.name,
-        items: cartItems.map(item => ({
-          productId: item.id,
-          name: item.name,
+        items: cart.items.map(item => ({
+          productId: item.product.id,
+          name: item.product.name,
           quantity: item.quantity,
-          price: item.price,
-          imageUrl: item.imageUrl,
+          price: parseFloat(item.product.price),
+          imageUrl: item.product.imageUrl,
         })),
         subtotal,
         tax,
@@ -175,15 +172,18 @@ function Checkout() {
           zipCode: formData.zipCode,
           country: formData.country,
         },
+        customerName: formData.name,
+        customerEmail: formData.email
       }
       
       const order = await orderService.createOrder(orderData)
       
-      // In a real app, this would also process the payment
+      // Clear the cart after successful order
+      await clearCart()
       
       toast.success('Order placed successfully!')
       
-      // Navigate to order confirmation or order history
+      // Navigate to order confirmation
       navigate(`/orders?new=${order.id}`)
     } catch (error) {
       console.error('Error placing order:', error)
@@ -313,7 +313,6 @@ function Checkout() {
                         <option value="USA">United States</option>
                         <option value="CAN">Canada</option>
                         <option value="MEX">Mexico</option>
-                        {/* Add more countries as needed */}
                       </select>
                     </div>
                   </div>
@@ -403,7 +402,7 @@ function Checkout() {
                 <button
                   type="submit"
                   className="btn-primary"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || cart.items.length === 0}
                 >
                   {isSubmitting ? 'Processing...' : 'Place Order'}
                 </button>
@@ -413,7 +412,7 @@ function Checkout() {
         </div>
         
         <div className="lg:col-span-1">
-          <OrderSummary cartItems={cartItems} />
+          <OrderSummary cartItems={cart.items} />
         </div>
       </div>
     </div>
