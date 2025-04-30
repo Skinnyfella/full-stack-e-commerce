@@ -54,6 +54,7 @@ const generateMockOrders = () => {
 
 // Mock order data for fallback
 let mockOrders = generateMockOrders()
+let paymentAttempts = new Map(); // Track payment attempts per order
 
 export const orderService = {
   // Get all orders with pagination, sorting, and filtering

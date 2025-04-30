@@ -5,6 +5,57 @@ import { orderService } from '../../services/orderService'
 import { useCart } from '../../contexts/CartContext'
 import PageHeader from '../../components/common/PageHeader'
 
+// Payment Status Modal Component
+function PaymentStatusModal({ isOpen, status, onClose }) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+      <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
+        <div className="text-center">
+          {status === 'processing' ? (
+            <>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+              <h3 className="mt-4 text-lg font-medium text-gray-900">Processing Payment</h3>
+              <p className="mt-2 text-sm text-gray-500">Please wait while we process your payment...</p>
+            </>
+          ) : status === 'success' ? (
+            <>
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-success-100">
+                <svg className="h-6 w-6 text-success-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="mt-4 text-lg font-medium text-success-900">Payment Successful</h3>
+              <p className="mt-2 text-sm text-gray-500">Your order has been placed successfully!</p>
+            </>
+          ) : (
+            <>
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-error-100">
+                <svg className="h-6 w-6 text-error-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
+              <h3 className="mt-4 text-lg font-medium text-error-900">Payment Failed</h3>
+              <p className="mt-2 text-sm text-gray-500">There was an error processing your payment. Please try again.</p>
+            </>
+          )}
+          
+          {status !== 'processing' && (
+            <button
+              type="button"
+              className="mt-6 btn-primary w-full"
+              onClick={onClose}
+            >
+              {status === 'success' ? 'View Order' : 'Try Again'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OrderSummary({ cartItems }) {
   // Calculate totals
   const subtotal = cartItems.reduce((sum, item) => sum + (parseFloat(item.product.price) * item.quantity), 0)
@@ -66,6 +117,7 @@ function Checkout() {
   const navigate = useNavigate()
   const { cart, clearCart } = useCart()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [modalState, setModalState] = useState({ isOpen: false, status: null })
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -143,6 +195,7 @@ function Checkout() {
     }
     
     setIsSubmitting(true)
+    setModalState({ isOpen: true, status: 'processing' })
     
     try {
       // Calculate totals (same as in OrderSummary)
@@ -181,18 +234,26 @@ function Checkout() {
       // Clear the cart after successful order
       await clearCart()
       
-      toast.success('Order placed successfully!')
+      // Show success modal
+      setModalState({ isOpen: true, status: 'success' })
       
-      // Navigate to order confirmation
-      navigate(`/orders?new=${order.id}`)
+      // Store order ID for navigation after modal closes
+      setModalState(prev => ({ ...prev, orderId: order.id }))
     } catch (error) {
       console.error('Error placing order:', error)
-      toast.error('Failed to place order. Please try again.')
+      setModalState({ isOpen: true, status: 'error' })
     } finally {
       setIsSubmitting(false)
     }
   }
   
+  const handleModalClose = () => {
+    if (modalState.status === 'success') {
+      navigate(`/orders?new=${modalState.orderId}`)
+    }
+    setModalState({ isOpen: false, status: null })
+  }
+
   return (
     <div>
       <PageHeader 
@@ -415,6 +476,12 @@ function Checkout() {
           <OrderSummary cartItems={cart.items} />
         </div>
       </div>
+
+      <PaymentStatusModal 
+        isOpen={modalState.isOpen}
+        status={modalState.status}
+        onClose={handleModalClose}
+      />
     </div>
   )
 }
