@@ -24,7 +24,7 @@ function ProductForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [categories, setCategories] = useState([])
-  
+
   // Load product data if editing
   useEffect(() => {
     const loadProduct = async () => {
@@ -155,7 +155,7 @@ function ProductForm() {
       setIsSaving(false)
     }
   }
-  
+
   if (isLoading) {
     return (
       <div className="animate-pulse">
@@ -302,7 +302,7 @@ function ProductForm() {
                   value={formData.imageUrl}
                   onChange={handleChange}
                   className={`input ${errors.imageUrl ? 'border-error-300' : ''}`}
-                  placeholder="https://example.com/image.jpg"
+                  placeholder="Enter image URL (e.g., https://example.com/image.jpg)"
                 />
                 {errors.imageUrl && <p className="mt-2 text-sm text-error-600">{errors.imageUrl}</p>}
                 {formData.imageUrl && (
@@ -312,14 +312,14 @@ function ProductForm() {
                       alt="Product preview" 
                       className="h-32 w-32 object-cover rounded-md"
                       onError={(e) => {
-                        e.target.onerror = null
-                        e.target.src = 'https://via.placeholder.com/150?text=Invalid+Image+URL'
+                        e.target.onerror = null;
+                        e.target.src = 'https://via.placeholder.com/150?text=Invalid+Image+URL';
                       }}
                     />
                   </div>
                 )}
               </div>
-              
+
               <div className="sm:col-span-6">
                 <label htmlFor="description" className="label">
                   Description
