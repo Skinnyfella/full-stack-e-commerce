@@ -1,70 +1,66 @@
-const { Model } = require('sequelize');
+const calculateStatus = (inventory) => {
+  if (!inventory || inventory === 0) return 'Out of Stock';
+  if (inventory <= 20) return 'Low Stock';
+  return 'In Stock';
+};
 
 module.exports = (sequelize, DataTypes) => {
-  class Product extends Model {
-    static associate(models) {
-      // define associations here
-      Product.belongsTo(models.Category, { foreignKey: 'category_id' });
-      Product.hasMany(models.OrderItem, { foreignKey: 'product_id' });
-      Product.hasMany(models.CartItem, { foreignKey: 'product_id' });
-      Product.hasMany(models.ProductReview, { foreignKey: 'product_id' });
-      Product.hasMany(models.WishlistItem, { foreignKey: 'product_id' });
-    }
-  }
-  
-  Product.init(
-    {
-      id: {
-        type: DataTypes.INTEGER,
-        primaryKey: true,
-        autoIncrement: true,
-      },
-      name: {
-        type: DataTypes.STRING(255),
-        allowNull: false,
-      },
-      slug: {
-        type: DataTypes.STRING(255),
-        allowNull: false,
-        unique: true,
-      },
-      description: {
-        type: DataTypes.TEXT,
-      },
-      price: {
-        type: DataTypes.DECIMAL(10, 2),
-        allowNull: false,
-      },
-      stock_quantity: {
-        type: DataTypes.INTEGER,
-        defaultValue: 0,
-      },
-      category_id: {
-        type: DataTypes.INTEGER,
-        references: {
-          model: 'categories',
-          key: 'id',
-        },
-      },
-      image_url: {
-        type: DataTypes.STRING(255),
-      },
-      created_at: {
-        type: DataTypes.DATE,
-        defaultValue: DataTypes.NOW,
-      },
-      updated_at: {
-        type: DataTypes.DATE,
-        defaultValue: DataTypes.NOW,
-      },
+  const Product = sequelize.define('Product', {
+    name: {
+      type: DataTypes.STRING,
+      allowNull: false
     },
-    {
-      sequelize,
-      modelName: 'Product',
-      tableName: 'products',
-      timestamps: false, // We handle timestamps manually
+    slug: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: true
+    },
+    description: DataTypes.TEXT,
+    price: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
+      defaultValue: 0.00
+    },
+    stock_quantity: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0
+    },
+    status: {
+      type: DataTypes.VIRTUAL,
+      get() {
+        return calculateStatus(this.stock_quantity);
+      }
+    },
+    category_id: {
+      type: DataTypes.INTEGER,
+      references: {
+        model: 'categories',
+        key: 'id'
+      }
+    },
+    image_url: DataTypes.STRING,
+    sku: {
+      type: DataTypes.STRING,
+      unique: true
+    },
+    created_at: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW
+    },
+    updated_at: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW
     }
-  );
-
+  });
+  
+  Product.associate = (models) => {
+    Product.belongsTo(models.Category);
+    Product.hasMany(models.CartItem);
+    Product.hasMany(models.OrderItem);
+    Product.hasMany(models.WishlistItem);
+    Product.hasMany(models.ProductReview);
+  };
+  
   return Product;
-}; 
+};

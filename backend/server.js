@@ -31,13 +31,18 @@ app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Test database connection
+// Test database connection and initialize categories
 (async () => {
   try {
     await db.sequelize.authenticate();
     console.log('Database connection established successfully.');
+    
+    // Ensure standard categories exist
+    await db.Category.ensureStandardCategories();
+    console.log('Standard categories initialized.');
+    
   } catch (error) {
-    console.error('Unable to connect to the database:', error);
+    console.error('Unable to connect to the database or initialize categories:', error);
   }
 })();
 
@@ -71,4 +76,4 @@ app.use((err, req, res, next) => {
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-}); 
+});

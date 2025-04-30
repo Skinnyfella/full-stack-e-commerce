@@ -13,23 +13,32 @@ const getAuthToken = async () => {
 // API base URL
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
+// Utility function to calculate product status based on inventory
+const calculateProductStatus = (inventory) => {
+  if (!inventory || inventory === 0) return 'Out of Stock';
+  if (inventory <= 20) return 'Low Stock';
+  return 'In Stock';
+};
+
 // Generate sample mock products for fallback
 const generateMockProducts = () => {
   const categories = ['Electronics', 'Clothing', 'Home & Kitchen', 'Books', 'Toys'];
-  const statuses = ['In Stock', 'Low Stock', 'Out of Stock'];
   
-  return Array.from({ length: 36 }, (_, i) => ({
-    id: (i + 1).toString(),
-    name: `Product ${i + 1}`,
-    description: `This is a detailed description for product ${i + 1}. It includes all the important features and benefits that customers need to know.`,
-    price: parseFloat((Math.random() * 100 + 10).toFixed(2)),
-    category: categories[Math.floor(Math.random() * categories.length)],
-    inventory: Math.floor(Math.random() * 100),
-    status: statuses[Math.floor(Math.random() * statuses.length)],
-    imageUrl: `https://picsum.photos/seed/product${i + 1}/400/300`,
-    sku: `SKU-${Math.floor(1000 + Math.random() * 9000)}`,
-    createdAt: new Date(Date.now() - Math.floor(Math.random() * 10000000000)).toISOString(),
-  }));
+  return Array.from({ length: 36 }, (_, i) => {
+    const inventory = Math.floor(Math.random() * 100);
+    return {
+      id: (i + 1).toString(),
+      name: `Product ${i + 1}`,
+      description: `This is a detailed description for product ${i + 1}. It includes all the important features and benefits that customers need to know.`,
+      price: parseFloat((Math.random() * 100 + 10).toFixed(2)),
+      category: categories[Math.floor(Math.random() * categories.length)],
+      inventory: inventory,
+      status: calculateProductStatus(inventory),
+      imageUrl: `https://picsum.photos/seed/product${i + 1}/400/300`,
+      sku: `SKU-${Math.floor(1000 + Math.random() * 9000)}`,
+      createdAt: new Date(Date.now() - Math.floor(Math.random() * 10000000000)).toISOString(),
+    };
+  });
 };
 
 // Mock products for fallback

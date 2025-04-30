@@ -11,11 +11,20 @@ function ProductCard({ product }) {
     id: product?.id || 'unknown',
     name: product?.name || 'Unnamed Product',
     price: product?.price || 0,
-    status: product?.status || 'Unknown',
+    inventory: product?.inventory || 0,
     description: product?.description || 'No description available',
     imageUrl: product?.imageUrl || 'https://placehold.co/400x300?text=No+Image',
     ...product
   }
+
+  // Calculate status based on inventory
+  const calculateStatus = (inventory) => {
+    if (!inventory || inventory === 0) return 'Out of Stock';
+    if (inventory <= 20) return 'Low Stock';
+    return 'In Stock';
+  };
+  
+  const status = calculateStatus(safeProduct.inventory);
   
   const handleClick = () => {
     if (isAdmin) {
@@ -27,11 +36,11 @@ function ProductCard({ product }) {
   
   // Function to show product status with the right color
   const getStatusBadge = () => {
-    switch(safeProduct.status) {
+    switch(status) {
       case 'In Stock':
-        return <span className="badge badge-success">In Stock</span>
+        return <span className="badge badge-success">In Stock ({safeProduct.inventory})</span>
       case 'Low Stock':
-        return <span className="badge badge-warning">Low Stock</span>
+        return <span className="badge badge-warning">Low Stock ({safeProduct.inventory} left)</span>
       case 'Out of Stock':
         return <span className="badge badge-error">Out of Stock</span>
       default:
@@ -68,7 +77,7 @@ function ProductCard({ product }) {
         <h3 className="text-lg font-medium text-gray-900 truncate">
           {safeProduct.name}
         </h3>
-        <div className="mt-1 flex justify-between">
+        <div className="mt-1 flex justify-between items-center">
           <p className="text-lg font-medium text-gray-900">${formatPrice(safeProduct.price)}</p>
           {getStatusBadge()}
         </div>
@@ -81,8 +90,11 @@ function ProductCard({ product }) {
               Edit Product
             </button>
           ) : (
-            <button className="btn-primary w-full">
-              View Details
+            <button 
+              className={`btn-primary w-full ${status === 'Out of Stock' ? 'opacity-50 cursor-not-allowed' : ''}`}
+              disabled={status === 'Out of Stock'}
+            >
+              {status === 'Out of Stock' ? 'Out of Stock' : 'View Details'}
             </button>
           )}
         </div>

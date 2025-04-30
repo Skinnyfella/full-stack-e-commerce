@@ -3,6 +3,12 @@ const db = require('../models');
 const supabase = require('../config/supabase');
 const slugify = require('slugify');
 
+const calculateStatus = (inventory) => {
+  if (!inventory || inventory === 0) return 'Out of Stock';
+  if (inventory <= 20) return 'Low Stock';
+  return 'In Stock';
+};
+
 /**
  * @desc    Get all products with optional filtering
  * @route   GET /api/products
@@ -17,7 +23,8 @@ const getProducts = async (req, res) => {
       minPrice, 
       maxPrice, 
       search,
-      sort = 'newest' 
+      sort = 'newest',
+      status
     } = req.query;
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -43,8 +50,27 @@ const getProducts = async (req, res) => {
     if (search) {
       whereClause[db.Sequelize.Op.or] = [
         { name: { [db.Sequelize.Op.iLike]: `%${search}%` } },
-        { description: { [db.Sequelize.Op.iLike]: `%${search}%` } }
+        { description: { [db.Sequelize.Op.iLike]: `%${search}%` } },
+        { sku: { [db.Sequelize.Op.iLike]: `%${search}%` } }
       ];
+    }
+
+    // Add status filter
+    if (status) {
+      switch (status) {
+        case 'In Stock':
+          whereClause.stock_quantity = { [db.Sequelize.Op.gt]: 20 };
+          break;
+        case 'Low Stock':
+          whereClause.stock_quantity = { 
+            [db.Sequelize.Op.gt]: 0,
+            [db.Sequelize.Op.lte]: 20 
+          };
+          break;
+        case 'Out of Stock':
+          whereClause.stock_quantity = { [db.Sequelize.Op.lte]: 0 };
+          break;
+      }
     }
     
     // Set order based on sort parameter
@@ -58,6 +84,12 @@ const getProducts = async (req, res) => {
         break;
       case 'price_desc':
         order = [['price', 'DESC']];
+        break;
+      case 'name_asc':
+        order = [['name', 'ASC']];
+        break;
+      case 'name_desc':
+        order = [['name', 'DESC']];
         break;
       default:
         order = [['created_at', 'DESC']];
@@ -77,8 +109,14 @@ const getProducts = async (req, res) => {
       ]
     });
     
+    // Add virtual status field to each product
+    const productsWithStatus = products.map(product => ({
+      ...product.toJSON(),
+      status: calculateStatus(product.stock_quantity)
+    }));
+    
     res.json({
-      products,
+      products: productsWithStatus,
       page: parseInt(page),
       pages: Math.ceil(count / parseInt(limit)),
       total: count
@@ -379,19 +417,33 @@ const getTopProducts = async (req, res) => {
  */
 const getProductCategories = async (req, res) => {
   try {
-    // Get all categories
+    // Ensure standard categories exist
+    await db.Category.ensureStandardCategories();
+    
+    // Get all categories with product counts
     const categories = await db.Category.findAll({
-      attributes: ['name'],
+      attributes: [
+        'name',
+        'slug',
+        [db.sequelize.fn('COUNT', db.sequelize.col('Products.id')), 'productCount']
+      ],
+      include: [{
+        model: db.Product,
+        attributes: [],
+        required: false
+      }],
+      group: ['Category.id', 'Category.name', 'Category.slug'],
       order: [['name', 'ASC']]
     });
     
-    // Extract category names and send as array
-    const categoryNames = categories.map(category => category.name);
+    // Map to simplified format
+    const formattedCategories = categories.map(category => category.name);
     
-    res.json(categoryNames);
+    res.json(formattedCategories);
   } catch (error) {
     console.error('Error fetching product categories:', error);
-    res.status(500).json({ message: 'Server error' });
+    // Return empty array instead of error to maintain frontend functionality
+    res.json([]);
   }
 };
 
@@ -404,4 +456,4 @@ module.exports = {
   uploadProductImage,
   getTopProducts,
   getProductCategories
-}; 
+};
