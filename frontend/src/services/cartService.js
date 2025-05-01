@@ -21,20 +21,9 @@ export const cartService = {
       // Get cart items with product details
       const { data, error } = await supabase
         .from('cart_items')
-        .select(`
-          id, 
-          quantity, 
-          product:product_id (
-            id, 
-            name, 
-            price, 
-            image_url,
-            stock_quantity,
-            description
-          )
-        `)
+        .select('id, quantity, product_id, products(id, name, price, image_url, stock_quantity, description, category)')
         .eq('user_id', user.user.id);
-      
+
       if (error) throw error;
       
       // Format data for frontend use
@@ -42,13 +31,14 @@ export const cartService = {
         id: item.id,
         quantity: item.quantity,
         product: {
-          id: item.product.id,
-          name: item.product.name,
-          price: item.product.price,
-          imageUrl: item.product.image_url,
-          inventory: item.product.stock_quantity || 0,
-          status: calculateProductStatus(item.product.stock_quantity),
-          description: item.product.description
+          id: item.products.id,
+          name: item.products.name,
+          price: item.products.price,
+          imageUrl: item.products.image_url,
+          inventory: item.products.stock_quantity || 0,
+          status: calculateProductStatus(item.products.stock_quantity),
+          description: item.products.description,
+          category: item.products.category
         }
       }));
       
