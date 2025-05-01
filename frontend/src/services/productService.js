@@ -1,6 +1,4 @@
-// Mock product service
-// In a real application, this would make API calls to your backend
-
+// Mock product service with Supabase integration
 import { apiClient } from './api';
 import { supabase } from '../utils/supabase';
 
@@ -9,6 +7,22 @@ const getAuthToken = async () => {
   const { data } = await supabase.auth.getSession();
   return data?.session?.access_token;
 };
+
+// Standard categories
+const STANDARD_CATEGORIES = [
+  'Electronics',
+  'Clothing & Accessories',
+  'Home & Kitchen',
+  'Books & Media',
+  'Sports & Outdoors',
+  'Beauty & Personal Care',
+  'Health & Wellness',
+  'Toys & Games',
+  'Automotive',
+  'Pet Supplies',
+  'Office Supplies',
+  'Food & Beverages',
+];
 
 // API base URL
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -30,15 +44,13 @@ const formatSupabaseProduct = (product) => ({
   imageUrl: product.image_url || 'https://placehold.co/400x300?text=No+Image',
   inventory: product.stock_quantity || 0,
   sku: product.sku || `SKU-${product.id}`,
-  category: product.category || 'Uncategorized',
+  category: product.category || 'Other',
   createdAt: product.created_at,
   status: calculateProductStatus(product.stock_quantity)
 });
 
 // Generate sample mock products for fallback
 const generateMockProducts = () => {
-  const categories = ['Electronics', 'Clothing', 'Home & Kitchen', 'Books', 'Toys'];
-  
   return Array.from({ length: 36 }, (_, i) => {
     const inventory = Math.floor(Math.random() * 100);
     return {
@@ -46,7 +58,7 @@ const generateMockProducts = () => {
       name: `Product ${i + 1}`,
       description: `This is a detailed description for product ${i + 1}. It includes all the important features and benefits that customers need to know.`,
       price: parseFloat((Math.random() * 100 + 10).toFixed(2)),
-      category: categories[Math.floor(Math.random() * categories.length)],
+      category: STANDARD_CATEGORIES[Math.floor(Math.random() * STANDARD_CATEGORIES.length)],
       inventory: inventory,
       status: calculateProductStatus(inventory),
       imageUrl: `https://picsum.photos/seed/product${i + 1}/400/300`,
@@ -86,12 +98,12 @@ export const productService = {
     } catch (error) {
       console.error('Error fetching products:', error);
       return {
-        products: [],
+        products: mockProducts,
         pagination: {
           page: 1,
-          limit: 10,
-          total: 0,
-          totalPages: 0
+          limit: mockProducts.length,
+          total: mockProducts.length,
+          totalPages: 1
         }
       };
     }
@@ -112,6 +124,9 @@ export const productService = {
       return formatSupabaseProduct(product);
     } catch (error) {
       console.error('Error fetching product:', error);
+      const mockProduct = mockProducts.find(p => p.id === id);
+      if (mockProduct) return mockProduct;
+
       return {
         id,
         name: 'Product Not Available',
@@ -121,7 +136,7 @@ export const productService = {
         inventory: 0,
         sku: 'UNAVAILABLE',
         status: 'Out of Stock',
-        category: 'Uncategorized',
+        category: 'Other',
       };
     }
   },
@@ -129,6 +144,11 @@ export const productService = {
   // Create a new product
   async createProduct(productData) {
     try {
+      // Ensure the category exists in our standard categories
+      const category = STANDARD_CATEGORIES.includes(productData.category) 
+        ? productData.category 
+        : 'Other';
+
       // Ensure inventory/stock_quantity is included
       const supabaseProduct = {
         name: productData.name,
@@ -137,7 +157,7 @@ export const productService = {
         stock_quantity: parseInt(productData.inventory, 10) || 0,
         image_url: productData.imageUrl || '',
         sku: productData.sku,
-        category: productData.category,
+        category: category,
         slug: productData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-$/, '')
       };
 
@@ -159,6 +179,11 @@ export const productService = {
   // Update an existing product
   async updateProduct(id, productData) {
     try {
+      // Ensure the category exists in our standard categories
+      const category = STANDARD_CATEGORIES.includes(productData.category) 
+        ? productData.category 
+        : 'Other';
+
       // Only include fields that exist in the database
       const supabaseProduct = {
         name: productData.name,
@@ -166,6 +191,7 @@ export const productService = {
         price: Number(productData.price),
         stock_quantity: parseInt(productData.inventory, 10) || 0,
         image_url: productData.imageUrl || '',
+        category: category,
         slug: productData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-$/, '')
       };
 
@@ -205,17 +231,10 @@ export const productService = {
   // Get all product categories
   async getCategories() {
     try {
-      const { data: categories, error } = await supabase
-        .from('categories')
-        .select('name')
-        .order('name');
-
-      if (error) throw error;
-
-      return categories.map(c => c.name);
+      return STANDARD_CATEGORIES;
     } catch (error) {
       console.error('Error fetching categories:', error);
-      return [];
+      return STANDARD_CATEGORIES;
     }
   },
 
@@ -271,7 +290,15 @@ export const productService = {
       };
     } catch (error) {
       console.error('Error in getSupabaseProducts:', error);
-      return { products: [] };
+      return { 
+        products: mockProducts,
+        pagination: {
+          page: 1,
+          limit: mockProducts.length,
+          total: mockProducts.length,
+          totalPages: 1
+        }
+      };
     }
   }
 };

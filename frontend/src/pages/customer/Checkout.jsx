@@ -151,31 +151,23 @@ function Checkout() {
   const validateForm = () => {
     const newErrors = {}
     
-    // Required fields
-    ;['name', 'email', 'address', 'city', 'state', 'zipCode', 'cardName', 'cardNumber', 'expDate', 'cvv'].forEach(field => {
-      if (!formData[field].trim()) {
-        newErrors[field] = 'This field is required'
-      }
-    })
-    
-    // Email validation
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Invalid email address'
+    // Only validate payment fields
+    if (!formData.cardNumber.trim()) {
+      newErrors.cardNumber = 'Card number is required'
+    } else if (!/^\d{16}$/.test(formData.cardNumber.replace(/\s/g, ''))) {
+      newErrors.cardNumber = 'Card number must be 16 digits'
     }
     
-    // Card number validation (basic)
-    if (formData.cardNumber && !/^\d{16}$/.test(formData.cardNumber.replace(/\s/g, ''))) {
-      newErrors.cardNumber = 'Invalid card number'
+    if (!formData.cardName.trim()) {
+      newErrors.cardName = 'Name on card is required'
     }
     
-    // Expiry date validation (MM/YY format)
-    if (formData.expDate && !/^\d{2}\/\d{2}$/.test(formData.expDate)) {
-      newErrors.expDate = 'Invalid format (MM/YY)'
+    if (!formData.expDate.trim()) {
+      newErrors.expDate = 'Expiration date is required'
     }
     
-    // CVV validation
-    if (formData.cvv && !/^\d{3,4}$/.test(formData.cvv)) {
-      newErrors.cvv = 'Invalid CVV'
+    if (!formData.cvv.trim()) {
+      newErrors.cvv = 'CVV is required'
     }
     
     setErrors(newErrors)
@@ -186,11 +178,6 @@ function Checkout() {
     e.preventDefault()
     
     if (!validateForm()) {
-      return
-    }
-    
-    if (cart.items.length === 0) {
-      toast.error('Your cart is empty')
       return
     }
     
@@ -205,7 +192,7 @@ function Checkout() {
       const tax = subtotal * 0.08
       const total = subtotal + tax + shipping
       
-      // Create order data
+      // Only pass minimal order data
       const orderData = {
         items: cart.items.map(item => ({
           productId: item.product.id,
@@ -217,16 +204,7 @@ function Checkout() {
         subtotal,
         tax,
         shipping,
-        total,
-        shippingAddress: {
-          street: formData.address,
-          city: formData.city,
-          state: formData.state,
-          zipCode: formData.zipCode,
-          country: formData.country,
-        },
-        customerName: formData.name,
-        customerEmail: formData.email
+        total
       }
       
       const order = await orderService.createOrder(orderData)
@@ -272,7 +250,7 @@ function Checkout() {
                   <div className="mt-6 grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
                     <div className="sm:col-span-3">
                       <label htmlFor="name" className="label">
-                        Full Name
+                        Full Name 
                       </label>
                       <input
                         type="text"
@@ -280,14 +258,13 @@ function Checkout() {
                         id="name"
                         value={formData.name}
                         onChange={handleChange}
-                        className={`input ${errors.name ? 'border-error-300' : ''}`}
+                        className="input"
                       />
-                      {errors.name && <p className="mt-2 text-sm text-error-600">{errors.name}</p>}
                     </div>
                     
                     <div className="sm:col-span-3">
                       <label htmlFor="email" className="label">
-                        Email Address
+                        Email Address 
                       </label>
                       <input
                         type="email"
@@ -295,14 +272,13 @@ function Checkout() {
                         id="email"
                         value={formData.email}
                         onChange={handleChange}
-                        className={`input ${errors.email ? 'border-error-300' : ''}`}
+                        className="input"
                       />
-                      {errors.email && <p className="mt-2 text-sm text-error-600">{errors.email}</p>}
                     </div>
                     
                     <div className="sm:col-span-6">
                       <label htmlFor="address" className="label">
-                        Street Address
+                        Street Address 
                       </label>
                       <input
                         type="text"
@@ -310,14 +286,13 @@ function Checkout() {
                         id="address"
                         value={formData.address}
                         onChange={handleChange}
-                        className={`input ${errors.address ? 'border-error-300' : ''}`}
+                        className="input"
                       />
-                      {errors.address && <p className="mt-2 text-sm text-error-600">{errors.address}</p>}
                     </div>
                     
                     <div className="sm:col-span-2">
                       <label htmlFor="city" className="label">
-                        City
+                        City 
                       </label>
                       <input
                         type="text"
@@ -325,14 +300,13 @@ function Checkout() {
                         id="city"
                         value={formData.city}
                         onChange={handleChange}
-                        className={`input ${errors.city ? 'border-error-300' : ''}`}
+                        className="input"
                       />
-                      {errors.city && <p className="mt-2 text-sm text-error-600">{errors.city}</p>}
                     </div>
                     
                     <div className="sm:col-span-2">
                       <label htmlFor="state" className="label">
-                        State / Province
+                        State / Province 
                       </label>
                       <input
                         type="text"
@@ -340,9 +314,8 @@ function Checkout() {
                         id="state"
                         value={formData.state}
                         onChange={handleChange}
-                        className={`input ${errors.state ? 'border-error-300' : ''}`}
+                        className="input"
                       />
-                      {errors.state && <p className="mt-2 text-sm text-error-600">{errors.state}</p>}
                     </div>
                     
                     <div className="sm:col-span-2">
@@ -355,26 +328,8 @@ function Checkout() {
                         id="zipCode"
                         value={formData.zipCode}
                         onChange={handleChange}
-                        className={`input ${errors.zipCode ? 'border-error-300' : ''}`}
-                      />
-                      {errors.zipCode && <p className="mt-2 text-sm text-error-600">{errors.zipCode}</p>}
-                    </div>
-                    
-                    <div className="sm:col-span-3">
-                      <label htmlFor="country" className="label">
-                        Country
-                      </label>
-                      <select
-                        id="country"
-                        name="country"
-                        value={formData.country}
-                        onChange={handleChange}
                         className="input"
-                      >
-                        <option value="USA">United States</option>
-                        <option value="CAN">Canada</option>
-                        <option value="MEX">Mexico</option>
-                      </select>
+                      />
                     </div>
                   </div>
                 </div>

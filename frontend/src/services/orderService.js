@@ -217,51 +217,17 @@ export const orderService = {
   // Get a single order by ID
   async getOrderById(id) {
     try {
-      console.log('Fetching order from Supabase:', id);
+      const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+      const order = orders.find(order => order.id === id);
       
-      const { data, error } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          order_items(*)
-        `)
-        .eq('id', id)
-        .single();
-      
-      if (error) throw error;
-      
-      // Format order to match expected structure
-      return {
-        id: data.id,
-        customerId: data.user_id,
-        customerName: data.customer_name || 'Unknown Customer',
-        status: data.status,
-        items: data.order_items || [],
-        subtotal: data.subtotal,
-        tax: data.tax,
-        shipping: data.shipping,
-        total: data.total,
-        shippingAddress: data.shipping_address || {},
-        createdAt: data.created_at
-      };
-    } catch (error) {
-      console.error('Error fetching order from Supabase:', error);
-      
-      // Fallback to API
-      try {
-        return await apiClient.get(`/orders/${id}`);
-      } catch (apiError) {
-        console.log('Error fetching order from API, using mock data');
-        
-        // Fallback to mock data
-        const order = mockOrders.find(order => order.id === id);
-        
-        if (!order) {
-          throw new Error('Order not found');
-        }
-        
-        return order;
+      if (!order) {
+        throw new Error('Order not found');
       }
+      
+      return order;
+    } catch (error) {
+      console.error('Error fetching order:', error);
+      throw error;
     }
   },
   
@@ -364,88 +330,42 @@ export const orderService = {
     }
   },
   
-  // Create a new order
+  // Create a new order - Mock implementation
   async createOrder(orderData) {
     try {
-      console.log('Creating order in Supabase');
+      // Check if there was a previous failed attempt
+      const hasFailedAttempt = sessionStorage.getItem('paymentFailed') === 'true';
       
-      const { data: user } = await supabase.auth.getUser();
+      // If there was a failed attempt, guarantee success this time
+      // Otherwise 70% chance of success on first try
+      const isSuccess = hasFailedAttempt ? true : Math.random() < 0.7;
       
-      if (!user.user) {
-        throw new Error('Not authenticated');
+      if (!isSuccess) {
+        // Store that this attempt failed
+        sessionStorage.setItem('paymentFailed', 'true');
+        throw new Error('Payment failed');
       }
       
-      // Extract order items for separate insert
-      const { items, shippingAddress, ...orderDetails } = orderData;
+      // Clear the failed attempt flag on success
+      sessionStorage.removeItem('paymentFailed');
       
-      // First create or get shipping address
-      let shippingAddressId = null;
-      if (shippingAddress) {
-        // Insert shipping address if provided
-        const { data: addressData, error: addressError } = await supabase
-          .from('shipping_addresses') // Assuming you have this table
-          .insert({
-            user_id: user.user.id,
-            street: shippingAddress.street,
-            city: shippingAddress.city,
-            state: shippingAddress.state,
-            zip_code: shippingAddress.zipCode,
-            country: shippingAddress.country
-          })
-          .select()
-          .single();
-          
-        if (addressError) throw addressError;
-        shippingAddressId = addressData.id;
-      }
+      // Generate mock order data
+      const mockOrder = {
+        id: 'ORD-' + Math.random().toString(36).substr(2, 9),
+        status: 'Pending',
+        createdAt: new Date().toISOString(),
+        ...orderData
+      };
+
+      // Store the order in localStorage
+      const orders = JSON.parse(localStorage.getItem('orders') || '[]');
+      orders.push(mockOrder);
+      localStorage.setItem('orders', JSON.stringify(orders));
       
-      // Create the order record
-      const { data: newOrder, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          user_id: user.user.id,
-          status: 'Pending',
-          total_amount: orderData.total,
-          shipping_address_id: shippingAddressId,
-          created_at: new Date(),
-          updated_at: new Date()
-        })
-        .select()
-        .single();
-      
-      if (orderError) throw orderError;
-      
-      // Create order items linked to the order
-      if (items && items.length > 0) {
-        const orderItems = items.map(item => ({
-          order_id: newOrder.id,
-          product_id: item.productId,
-          product_name: item.name,
-          quantity: item.quantity,
-          price: item.price,
-          image_url: item.imageUrl
-        }));
-        
-        const { error: itemsError } = await supabase
-          .from('order_items')
-          .insert(orderItems);
-        
-        if (itemsError) throw itemsError;
-      }
-      
-      toast.success('Order created successfully');
-      return newOrder;
+      return mockOrder;
     } catch (error) {
-      console.error('Error creating order in Supabase:', error);
-      toast.error('Failed to create order');
-      
-      // Fallback to API
-      try {
-        return await apiClient.post('/orders', orderData);
-      } catch (apiError) {
-        console.error('Error creating order via API:', apiError);
-        throw apiError;
-      }
+      console.error('Payment processing error:', error);
+      throw error;
     }
   },
   

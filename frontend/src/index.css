@@ -131,3 +131,17 @@ h3 {
 .page-transition {
   @apply transition-all duration-300 ease-in-out;
 }
+
+/* Order highlight animation */
+.highlight-order {
+  animation: highlightOrder 2s ease-in-out;
+}
+
+@keyframes highlightOrder {
+  0%, 100% {
+    background-color: white;
+  }
+  50% {
+    background-color: rgba(59, 130, 246, 0.1);
+  }
+}
