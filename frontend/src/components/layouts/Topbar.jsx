@@ -14,13 +14,24 @@ function UserMenu() {
     navigate('/login')
   }
   
+  // Get the first letter of the first name, fallback to email, then to 'U'
+  const getInitial = () => {
+    if (user?.first_name) {
+      return user.first_name.charAt(0).toUpperCase()
+    }
+    if (user?.email) {
+      return user.email.charAt(0).toUpperCase()
+    }
+    return 'U'
+  }
+  
   return (
     <Menu as="div" className="ml-3 relative">
       <div>
         <Menu.Button className="flex max-w-xs items-center rounded-full bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2">
           <span className="sr-only">Open user menu</span>
           <div className="h-8 w-8 rounded-full bg-primary-500 flex items-center justify-center text-white">
-            {user?.name?.charAt(0) || 'U'}
+            {getInitial()}
           </div>
         </Menu.Button>
       </div>

@@ -2,6 +2,7 @@
 // In a real application, this would make API calls to your backend
 
 import { supabase } from '../utils/supabase';
+import { jwtDecode } from 'jwt-decode';
 
 // Get admin email from environment variables
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL;
@@ -174,6 +175,37 @@ export const authService = {
     }
     
     return await enhanceUserWithRole(session.user);
+  },
+
+  // Get JWT fallback token
+  async getJWTFallbackToken() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return null;
+
+      // Create a JWT that expires in 1 hour
+      const token = session.access_token;
+      const decodedToken = jwtDecode(token);
+      
+      // If the Supabase token is valid and has an expiration, use it
+      if (decodedToken && decodedToken.exp) {
+        return token;
+      }
+
+      // If no valid token from Supabase, create a fallback token
+      const fallbackToken = {
+        ...decodedToken,
+        exp: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
+        iat: Math.floor(Date.now() / 1000)
+      };
+
+      // In a real app, you would sign this token with your backend
+      // For now, we'll use the Supabase token as is
+      return token;
+    } catch (error) {
+      console.error('Error getting JWT fallback token:', error);
+      return null;
+    }
   },
   
   // Update user profile
