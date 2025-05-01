@@ -147,13 +147,13 @@ function Topbar({ onMenuButtonClick }) {
         <span className="sr-only">Open sidebar</span>
         <Bars3Icon className="h-6 w-6" aria-hidden="true" />
       </button>
-      <div className="flex-1 px-4 flex justify-between">
-        <div className="flex-1 flex">
-          <form className="w-full flex md:ml-0" action="#" method="GET">
+      <div className="flex-1 px-4 flex justify-between items-center">
+        <div className="flex-1 flex justify-center">
+          <form className="flex items-center" action="#" method="GET">
             <label htmlFor="search-field" className="sr-only">
               Search
             </label>
-            <div className="relative w-full text-gray-400 focus-within:text-gray-600">
+            <div className="relative text-gray-400 focus-within:text-gray-600">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                 <MagnifyingGlassIcon className="h-5 w-5" aria-hidden="true" />
               </div>

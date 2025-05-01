@@ -47,7 +47,7 @@ function Sidebar() {
   return (
     <div className="flex flex-col flex-grow bg-primary-700 pt-5 pb-4 overflow-y-auto">
       <div className="flex items-center flex-shrink-0 px-4">
-        <span className="text-white text-xl font-bold">Inventory Pro</span>
+        <span className="text-white text-xl font-bold">Cavallo</span>
       </div>
       <div className="mt-5 flex-grow flex flex-col">
         <nav className="flex-1 px-2 space-y-1">
