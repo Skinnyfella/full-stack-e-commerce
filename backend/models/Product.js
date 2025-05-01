@@ -42,7 +42,8 @@ module.exports = (sequelize, DataTypes) => {
     image_url: DataTypes.STRING,
     sku: {
       type: DataTypes.STRING,
-      unique: true
+      unique: true,
+      allowNull: false
     },
     created_at: {
       type: DataTypes.DATE,
