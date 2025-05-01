@@ -333,21 +333,22 @@ export const orderService = {
   // Create a new order - Mock implementation
   async createOrder(orderData) {
     try {
-      // Check if there was a previous failed attempt
-      const hasFailedAttempt = sessionStorage.getItem('paymentFailed') === 'true';
+      // Use unique key for each order attempt
+      const attemptKey = Date.now().toString();
+      const hasFailedAttempt = sessionStorage.getItem(attemptKey) === 'failed';
       
-      // If there was a failed attempt, guarantee success this time
-      // Otherwise 70% chance of success on first try
-      const isSuccess = hasFailedAttempt ? true : Math.random() < 0.7;
+      // If this is a retry after a failure, guarantee success
+      // Otherwise 50% chance of success
+      const isSuccess = hasFailedAttempt || Math.random() >= 0.5;
       
       if (!isSuccess) {
-        // Store that this attempt failed
-        sessionStorage.setItem('paymentFailed', 'true');
+        // Store this attempt as failed
+        sessionStorage.setItem(attemptKey, 'failed');
         throw new Error('Payment failed');
       }
       
-      // Clear the failed attempt flag on success
-      sessionStorage.removeItem('paymentFailed');
+      // Clear all failed attempt flags
+      sessionStorage.clear();
       
       // Generate mock order data
       const mockOrder = {

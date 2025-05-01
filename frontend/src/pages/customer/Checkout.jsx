@@ -241,7 +241,7 @@ function Checkout() {
       
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <form onSubmit={handleSubmit}>
+          <form method="POST" onSubmit={handleSubmit}>
             <div className="space-y-6">
               {/* Shipping Information */}
               <div className="bg-white overflow-hidden shadow rounded-lg">
