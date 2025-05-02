@@ -1,28 +1,27 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense, lazy } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
-import { toast } from 'react-hot-toast'
+import { toast, Toaster } from 'react-hot-toast'
 
 // Layouts
 import DashboardLayout from './layouts/DashboardLayout'
 import AuthLayout from './layouts/AuthLayout'
+import LoadingSpinner from './components/common/LoadingSpinner'
 
-// Auth Pages
-import LoginPage from './pages/auth/LoginPage'
-import RegisterPage from './pages/auth/RegisterPage'
+// Lazy-loaded route components
+const LoginPage = lazy(() => import('./pages/auth/LoginPage'))
+const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'))
+const ProductCatalog = lazy(() => import('./pages/customer/ProductCatalog'))
+const ProductDetail = lazy(() => import('./pages/customer/ProductDetail'))
+const Cart = lazy(() => import('./pages/customer/Cart'))
+const Checkout = lazy(() => import('./pages/customer/Checkout'))
+const OrderHistory = lazy(() => import('./pages/customer/OrderHistory'))
 
-// Admin Pages
-import AdminDashboard from './pages/admin/AdminDashboard'
-import ProductList from './pages/admin/ProductList'
-import ProductForm from './pages/admin/ProductForm'
-import OrderList from './pages/admin/OrderList'
-
-// Customer Pages
-import ProductCatalog from './pages/customer/ProductCatalog'
-import ProductDetail from './pages/customer/ProductDetail'
-import Cart from './pages/customer/Cart'
-import Checkout from './pages/customer/Checkout'
-import OrderHistory from './pages/customer/OrderHistory'
+// Admin routes lazy loaded
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
+const ProductList = lazy(() => import('./pages/admin/ProductList'))
+const OrderList = lazy(() => import('./pages/admin/OrderList'))
+const ProductForm = lazy(() => import('./pages/admin/ProductForm'))
 
 // Utility/Error Pages
 import NotFoundPage from './pages/NotFoundPage'
@@ -111,50 +110,56 @@ function App() {
   }, [checkAuth])
   
   return (
-    <div className="min-h-full">
-      <Routes>
-        {/* Auth Routes */}
-        <Route element={<AuthLayout />}>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-        </Route>
-        
-        {/* Admin Routes */}
-        <Route 
-          path="/admin" 
-          element={
-            <RequireAuth allowedRoles={['admin']}>
-              <DashboardLayout />
-            </RequireAuth>
-          }
-        >
-          <Route index element={withErrorBoundary(AdminDashboard)()} />
-          <Route path="products" element={withErrorBoundary(ProductList)()} />
-          <Route path="products/create" element={withErrorBoundary(ProductForm)()} />
-          <Route path="products/edit/:id" element={withErrorBoundary(ProductForm)()} />
-          <Route path="orders" element={withErrorBoundary(OrderList)()} />
-        </Route>
-        
-        {/* Customer Routes */}
-        <Route 
-          path="/" 
-          element={
-            <RequireAuth allowedRoles={['customer']}>
-              <DashboardLayout />
-            </RequireAuth>
-          }
-        >
-          <Route index element={withErrorBoundary(ProductCatalog)()} />
-          <Route path="products/:id" element={withErrorBoundary(ProductDetail)()} />
-          <Route path="cart" element={withErrorBoundary(Cart)()} />
-          <Route path="checkout" element={withErrorBoundary(Checkout)()} />
-          <Route path="orders" element={withErrorBoundary(OrderHistory)()} />
-        </Route>
-        
-        {/* Catch-all route */}
-        <Route path="*" element={<NotFoundPage />} />
-      </Routes>
-    </div>
+    <>
+      <Suspense fallback={<LoadingSpinner />}>
+        <div className="min-h-full">
+          <Routes>
+            {/* Auth Routes */}
+            <Route element={<AuthLayout />}>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+            </Route>
+            
+            {/* Admin Routes */}
+            <Route 
+              path="/admin" 
+              element={
+                <RequireAuth allowedRoles={['admin']}>
+                  <DashboardLayout />
+                </RequireAuth>
+              }
+            >
+              <Route index element={withErrorBoundary(AdminDashboard)()} />
+              <Route path="products" element={withErrorBoundary(ProductList)()} />
+              <Route path="products/create" element={withErrorBoundary(ProductForm)()} />
+              <Route path="products/edit/:id" element={withErrorBoundary(ProductForm)()} />
+              <Route path="orders" element={withErrorBoundary(OrderList)()} />
+            </Route>
+            
+            {/* Customer Routes */}
+            <Route 
+              path="/" 
+              element={
+                <RequireAuth allowedRoles={['customer']}>
+                  <DashboardLayout />
+                </RequireAuth>
+              }
+            >
+              <Route index element={withErrorBoundary(ProductCatalog)()} />
+              <Route path="products/:id" element={withErrorBoundary(ProductDetail)()} />
+              <Route path="cart" element={withErrorBoundary(Cart)()} />
+              <Route path="checkout" element={withErrorBoundary(Checkout)()} />
+              <Route path="orders" element={withErrorBoundary(OrderHistory)()} />
+            </Route>
+            
+            {/* Catch-all route */}
+            <Route path="*" element={<NotFoundPage />} />
+          </Routes>
+        </div>
+      </Suspense>
+
+      <Toaster position="top-right" />
+    </>
   )
 }
 

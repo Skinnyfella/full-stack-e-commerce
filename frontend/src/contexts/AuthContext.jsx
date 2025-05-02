@@ -1,6 +1,6 @@
 import { createContext, useCallback, useEffect, useMemo, useState } from 'react'
 import { authService } from '../services/authService'
-import { jwtDecode } from 'jwt-decode'
+import { jwtDecode as jwtDecodeImport } from 'jwt-decode'
 
 export const AuthContext = createContext(null)
 
@@ -13,7 +13,7 @@ export function AuthProvider({ children }) {
     const token = localStorage.getItem('fallbackToken')
     if (token) {
       try {
-        const decodedToken = jwtDecode(token)
+        const decodedToken = jwtDecodeImport(token)
         const currentTime = Date.now() / 1000
         
         // Check if token is expired or will expire in next 5 minutes

@@ -27,6 +27,13 @@ const STANDARD_CATEGORIES = [
 // API base URL
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
+// Add cache for products
+let productsCache = {
+  data: null,
+  timestamp: null,
+  expiryTime: 5 * 60 * 1000 // 5 minutes
+};
+
 // Utility function to calculate product status based on inventory
 const calculateProductStatus = (inventory) => {
   const stock = parseInt(inventory, 10);
@@ -75,6 +82,15 @@ export const productService = {
   // Get all products with pagination, sorting, and filtering
   async getProducts(params = {}) {
     try {
+      // Check cache if no filters are applied
+      const noFiltersApplied = !params.category && !params.search && !params.status;
+      const cacheValid = productsCache.data && 
+        (Date.now() - productsCache.timestamp) < productsCache.expiryTime;
+      
+      if (noFiltersApplied && cacheValid) {
+        return productsCache.data;
+      }
+
       // Try Supabase first
       const { data: products, error } = await supabase
         .from('products')
@@ -83,18 +99,23 @@ export const productService = {
 
       if (error) throw error;
 
-      // Format products with correct status
-      const formattedProducts = products.map(formatSupabaseProduct);
-
-      return {
-        products: formattedProducts,
+      // Format and cache the response
+      const formattedData = {
+        products: products.map(formatSupabaseProduct),
         pagination: {
           page: 1,
-          limit: formattedProducts.length,
-          total: formattedProducts.length,
+          limit: products.length,
+          total: products.length,
           totalPages: 1
         }
       };
+
+      if (noFiltersApplied) {
+        productsCache.data = formattedData;
+        productsCache.timestamp = Date.now();
+      }
+
+      return formattedData;
     } catch (error) {
       console.error('Error fetching products:', error);
       return {

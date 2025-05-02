@@ -1,7 +1,11 @@
 const { validationResult } = require('express-validator');
+const NodeCache = require('node-cache');
 const db = require('../models');
 const supabase = require('../config/supabase');
 const slugify = require('slugify');
+
+// Initialize cache with 5 minutes standard TTL
+const cache = new NodeCache({ stdTTL: 300 }); // 5 minutes
 
 const calculateStatus = (inventory) => {
   if (!inventory || inventory === 0) return 'Out of Stock';
@@ -9,11 +13,7 @@ const calculateStatus = (inventory) => {
   return 'In Stock';
 };
 
-/**
- * @desc    Get all products with optional filtering
- * @route   GET /api/products
- * @access  Public
- */
+// Get products with caching
 const getProducts = async (req, res) => {
   try {
     const { 
@@ -26,6 +26,15 @@ const getProducts = async (req, res) => {
       sort = 'newest',
       status
     } = req.query;
+
+    // Generate cache key based on query parameters
+    const cacheKey = `products:${JSON.stringify({ page, limit, category, minPrice, maxPrice, search, sort, status })}`;
+    
+    // Try to get from cache first
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) {
+      return res.json(cachedData);
+    }
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
     
@@ -115,26 +124,34 @@ const getProducts = async (req, res) => {
       status: calculateStatus(product.stock_quantity)
     }));
     
-    res.json({
+    const result = {
       products: productsWithStatus,
       page: parseInt(page),
       pages: Math.ceil(count / parseInt(limit)),
       total: count
-    });
+    };
+    
+    // Store in cache
+    cache.set(cacheKey, result);
+    
+    res.json(result);
   } catch (error) {
     console.error('Error fetching products:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
 
-/**
- * @desc    Get product by ID or slug
- * @route   GET /api/products/:id
- * @access  Public
- */
+// Get single product with caching
 const getProductById = async (req, res) => {
   try {
     const identifier = req.params.id;
+    const cacheKey = `product:${identifier}`;
+    
+    // Try cache first
+    const cachedProduct = cache.get(cacheKey);
+    if (cachedProduct) {
+      return res.json(cachedProduct);
+    }
     
     // Find by ID or slug
     const whereClause = isNaN(identifier) 
@@ -163,6 +180,9 @@ const getProductById = async (req, res) => {
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
+
+    // Cache the product
+    cache.set(cacheKey, product);
     
     res.json(product);
   } catch (error) {
@@ -171,11 +191,20 @@ const getProductById = async (req, res) => {
   }
 };
 
-/**
- * @desc    Create a new product
- * @route   POST /api/products
- * @access  Private/Admin
- */
+// Clear product cache when updating
+const clearProductCache = (productId) => {
+  // Clear specific product cache
+  cache.del(`product:${productId}`);
+  // Clear all products list caches (they contain this product)
+  const keys = cache.keys();
+  keys.forEach(key => {
+    if (key.startsWith('products:')) {
+      cache.del(key);
+    }
+  });
+};
+
+// Update existing controller methods to clear cache
 const createProduct = async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -216,6 +245,9 @@ const createProduct = async (req, res) => {
       image_url
     });
     
+    // Clear products list cache after creating
+    clearProductCache(product.id);
+    
     res.status(201).json(product);
   } catch (error) {
     console.error('Error creating product:', error);
@@ -223,11 +255,6 @@ const createProduct = async (req, res) => {
   }
 };
 
-/**
- * @desc    Update a product
- * @route   PUT /api/products/:id
- * @access  Private/Admin
- */
 const updateProduct = async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -285,6 +312,9 @@ const updateProduct = async (req, res) => {
       updated_at: new Date()
     });
     
+    // Clear cache after updating
+    clearProductCache(req.params.id);
+    
     res.json(product);
   } catch (error) {
     console.error('Error updating product:', error);
@@ -292,11 +322,6 @@ const updateProduct = async (req, res) => {
   }
 };
 
-/**
- * @desc    Delete a product
- * @route   DELETE /api/products/:id
- * @access  Private/Admin
- */
 const deleteProduct = async (req, res) => {
   try {
     const product = await db.Product.findByPk(req.params.id);
@@ -321,6 +346,9 @@ const deleteProduct = async (req, res) => {
     
     // Delete the product
     await product.destroy();
+    
+    // Clear cache after deleting
+    clearProductCache(req.params.id);
     
     res.json({ message: 'Product removed' });
   } catch (error) {
