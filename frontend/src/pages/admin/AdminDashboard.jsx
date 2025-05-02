@@ -176,49 +176,36 @@ function AdminDashboard() {
     recentOrders: [],
     lowStockProducts: []
   })
-  
+
   useEffect(() => {
+    // Create an AbortController for cleanup
+    const controller = new AbortController();
+
     const loadDashboardData = async () => {
       setIsLoading(true)
       try {
-        // Load order stats with error handling
-        let orderStats = { totalOrders: 0, totalRevenue: 0 };
-        try {
-          orderStats = await orderService.getOrderStats();
-        } catch (error) {
-          console.error('Error loading order stats:', error);
-        }
-        
-        // Load recent orders with error handling
-        let recentOrders = [];
-        try {
-          const orderData = await orderService.getOrders({ 
+        // Load all data in parallel
+        const [orderStats, orderData, productData] = await Promise.all([
+          orderService.getOrderStats(),
+          orderService.getOrders({ 
             page: 1, 
             limit: 5, 
             sortBy: 'createdAt', 
             sortOrder: 'desc' 
-          });
-          recentOrders = orderData.orders || [];
-        } catch (error) {
-          console.error('Error loading recent orders:', error);
-        }
-        
-        // Load low stock products with error handling
-        let lowStockProducts = [];
-        try {
-          const productData = await productService.getProducts();
-          lowStockProducts = (productData.products || []).filter(
-            product => product.status === 'Low Stock' || product.inventory < 10
-          ).slice(0, 5);
-        } catch (error) {
-          console.error('Error loading low stock products:', error);
-        }
-        
+          }),
+          productService.getProducts()
+        ]);
+
+        // Process low stock products
+        const lowStockProducts = (productData.products || [])
+          .filter(product => product.status === 'Low Stock' || product.inventory < 10)
+          .slice(0, 5);
+
         setDashboardData({
-          stats: orderStats,
-          recentOrders,
+          stats: orderStats || { totalOrders: 0, totalRevenue: 0 },
+          recentOrders: orderData.orders || [],
           lowStockProducts
-        })
+        });
       } catch (error) {
         console.error('Error loading dashboard data:', error);
         setDashboardData({
@@ -227,11 +214,16 @@ function AdminDashboard() {
           lowStockProducts: []
         });
       } finally {
-        setIsLoading(false)
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
+        }
       }
-    }
+    };
     
-    loadDashboardData()
+    loadDashboardData();
+
+    // Cleanup function to cancel ongoing requests
+    return () => controller.abort();
   }, [])
   
   // Format currency

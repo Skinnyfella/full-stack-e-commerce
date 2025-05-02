@@ -37,12 +37,19 @@ app.use(express.urlencoded({ extended: true }));
     await db.sequelize.authenticate();
     console.log('Database connection established successfully.');
     
-    // Ensure standard categories exist
+    // Sync database tables
+    await db.sequelize.sync();
+    console.log('Database tables synchronized.');
+
+    // Now ensure standard categories exist
     await db.Category.ensureStandardCategories();
     console.log('Standard categories initialized.');
-    
+
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
   } catch (error) {
-    console.error('Unable to connect to the database or initialize categories:', error);
+    console.error('Unable to connect to the database:', error);
   }
 })();
 
@@ -71,9 +78,4 @@ app.use((err, req, res, next) => {
     message: 'Something went wrong!',
     error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
   });
-});
-
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
 });
