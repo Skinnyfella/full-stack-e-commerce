@@ -85,9 +85,10 @@ const createOrder = async (req, res) => {
     const mockCardDetails = { number: '4242424242424242', expiry: '12/25', cvc: '123' };
     const paymentResult = await mockPaymentService.processPayment(totalAmount, mockCardDetails);
     
+    // Remove sensitive payment details from logs
     if (!paymentResult.success) {
       await transaction.rollback();
-      return res.status(400).json({ message: 'Payment failed', error: paymentResult.error });
+      return res.status(400).json({ message: 'Payment failed' });
     }
     
     // Create order
@@ -158,7 +159,7 @@ const createOrder = async (req, res) => {
   } catch (error) {
     // Only roll back if transaction exists and is not committed
     if (transaction) await transaction.rollback();
-    console.error('Order creation error:', error);
+    console.error('Order processing error occurred');
     res.status(500).json({ message: 'Error processing your order. Please try again.' });
   }
 };
@@ -355,4 +356,4 @@ module.exports = {
   updateOrderToPaid,
   getAllOrders,
   updateOrderStatus
-}; 
+};

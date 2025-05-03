@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 
 function ProductCard({ product }) {
@@ -8,8 +8,8 @@ function ProductCard({ product }) {
   
   // Ensure product has expected properties with fallbacks
   const safeProduct = {
-    id: product?.id || 'unknown',
-    name: product?.name || 'Unnamed Product',
+    id: product?.id || 'not-found',
+    name: product?.name || 'Product Not Available',
     price: product?.price || 0,
     inventory: product?.inventory || 0,
     description: product?.description || 'No description available',
@@ -51,41 +51,53 @@ function ProductCard({ product }) {
   };
 
   return (
-    <div 
-      className="relative flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white"
-      onClick={handleClick}
-    >
-      <div className="aspect-h-4 aspect-w-3 bg-gray-200 sm:aspect-none group-hover:opacity-75 sm:h-96">
+    <div className="bg-white rounded-lg shadow overflow-hidden h-full flex flex-col">
+      <div className="aspect-w-4 aspect-h-3">
         <img
           src={safeProduct.imageUrl}
           alt={safeProduct.name}
-          className="h-full w-full object-cover object-center sm:h-full sm:w-full"
+          className="w-full h-full object-cover"
         />
       </div>
-      <div className="flex flex-1 flex-col space-y-2 p-4">
-        <h3 className="text-sm font-medium text-gray-900">
+      
+      <div className="p-4 flex-1 flex flex-col">
+        <h3 className="text-lg font-medium text-gray-900 mb-2 line-clamp-1">
           {safeProduct.name}
         </h3>
-        <p className="text-base font-medium text-gray-900">
-          ${formatPrice(safeProduct.price)}
-        </p>
-        {getStatusBadge()}
-        <p className="mt-2 text-sm text-gray-500 line-clamp-2">
+        
+        <p className="text-sm text-gray-500 mb-4 flex-1 line-clamp-2">
           {safeProduct.description}
         </p>
-        <div className="mt-4">
-          {isAdmin ? (
-            <button className="btn-secondary w-full">
-              Edit Product
-            </button>
-          ) : (
-            <button 
-              className={`btn-primary w-full ${safeProduct.status === 'Out of Stock' ? 'opacity-50 cursor-not-allowed' : ''}`}
-              disabled={safeProduct.status === 'Out of Stock'}
-            >
-              {safeProduct.status === 'Out of Stock' ? 'Out of Stock' : 'View Details'}
-            </button>
-          )}
+        
+        <div className="mt-auto">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-xl font-bold text-gray-900">
+              ${typeof safeProduct.price === 'number' 
+                ? safeProduct.price.toFixed(2) 
+                : parseFloat(safeProduct.price).toFixed(2)}
+            </p>
+            <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+              safeProduct.status === 'In Stock' 
+                ? 'bg-green-100 text-green-800'
+                : safeProduct.status === 'Low Stock'
+                ? 'bg-yellow-100 text-yellow-800'
+                : 'bg-red-100 text-red-800'
+            }`}>
+              {safeProduct.status}
+            </span>
+          </div>
+          
+          <Link
+            to={`/products/${safeProduct.id}`}
+            className={`w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${
+              safeProduct.status === 'Out of Stock'
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-primary-600 hover:bg-primary-700'
+            }`}
+            disabled={safeProduct.status === 'Out of Stock'}
+          >
+            {safeProduct.status === 'Out of Stock' ? 'Out of Stock' : 'View Details'}
+          </Link>
         </div>
       </div>
     </div>

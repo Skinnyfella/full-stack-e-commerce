@@ -13,6 +13,11 @@ const calculateStatus = (inventory) => {
   return 'In Stock';
 };
 
+const sanitizeSearchQuery = (query) => {
+  // Remove any SQL-injection prone characters
+  return query.replace(/[;'"\\]/g, '');
+};
+
 // Get products with caching
 const getProducts = async (req, res) => {
   try {
@@ -27,8 +32,20 @@ const getProducts = async (req, res) => {
       status
     } = req.query;
 
-    // Generate cache key based on query parameters
-    const cacheKey = `products:${JSON.stringify({ page, limit, category, minPrice, maxPrice, search, sort, status })}`;
+    // Sanitize search input
+    const sanitizedSearch = search ? sanitizeSearchQuery(search) : null;
+
+    // Generate cache key based on sanitized parameters
+    const cacheKey = `products:${JSON.stringify({ 
+      page, 
+      limit, 
+      category, 
+      minPrice, 
+      maxPrice, 
+      search: sanitizedSearch, 
+      sort, 
+      status 
+    })}`;
     
     // Try to get from cache first
     const cachedData = cache.get(cacheKey);
@@ -56,11 +73,11 @@ const getProducts = async (req, res) => {
       whereClause.price = { ...whereClause.price, [db.Sequelize.Op.lte]: maxPrice };
     }
     
-    if (search) {
+    if (sanitizedSearch) {
       whereClause[db.Sequelize.Op.or] = [
-        { name: { [db.Sequelize.Op.iLike]: `%${search}%` } },
-        { description: { [db.Sequelize.Op.iLike]: `%${search}%` } },
-        { sku: { [db.Sequelize.Op.iLike]: `%${search}%` } }
+        { name: { [db.Sequelize.Op.iLike]: `%${sanitizedSearch}%` } },
+        { description: { [db.Sequelize.Op.iLike]: `%${sanitizedSearch}%` } },
+        { sku: { [db.Sequelize.Op.iLike]: `%${sanitizedSearch}%` } }
       ];
     }
 
@@ -357,6 +374,9 @@ const deleteProduct = async (req, res) => {
   }
 };
 
+const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
 /**
  * @desc    Upload product image to Supabase Storage
  * @route   POST /api/products/upload-image
@@ -367,16 +387,35 @@ const uploadProductImage = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ message: 'No image file provided' });
     }
-    
+
     const file = req.file;
-    const fileExt = file.originalname.split('.').pop();
-    const fileName = `${Date.now()}.${fileExt}`;
+
+    // Validate file type
+    if (!ALLOWED_FILE_TYPES.includes(file.mimetype)) {
+      return res.status(400).json({ 
+        message: `Invalid file type. Allowed types: ${ALLOWED_FILE_TYPES.join(', ')}` 
+      });
+    }
+
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE) {
+      return res.status(400).json({ 
+        message: `File too large. Maximum size: ${MAX_FILE_SIZE / 1024 / 1024}MB` 
+      });
+    }
+
+    // Generate safe filename
+    const fileExt = file.originalname.split('.').pop().toLowerCase();
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
     
-    // Upload to Supabase Storage
+    // Upload to Supabase Storage with additional headers
     const { data, error } = await supabase.storage
       .from('product-images')
       .upload(fileName, file.buffer, {
         contentType: file.mimetype,
+        cacheControl: '3600',
+        upsert: false,
+        duplex: 'half'
       });
     
     if (error) {

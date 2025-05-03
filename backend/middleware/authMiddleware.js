@@ -1,5 +1,18 @@
 const supabase = require('../config/supabase');
 const db = require('../models');
+const rateLimit = require('express-rate-limit');
+
+// Create specific limiters
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 attempts
+  message: 'Too many authentication attempts, please try again later'
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100
+});
 
 /**
  * Middleware to verify Supabase token and attach user to request
@@ -67,12 +80,14 @@ const isAdmin = async (req, res, next) => {
     
     next();
   } catch (error) {
-    console.error('Admin check error:', error);
+    // Generic error for security
     return res.status(500).json({ message: 'Authorization error' });
   }
 };
 
 module.exports = {
   isAuthenticated,
-  isAdmin
-}; 
+  isAdmin,
+  authLimiter,
+  apiLimiter
+};

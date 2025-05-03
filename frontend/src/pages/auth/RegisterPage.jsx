@@ -49,8 +49,10 @@ function RegisterPage() {
     
     if (!formData.password) {
       newErrors.password = 'Password is required'
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters'
+    } else if (formData.password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters'
+    } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])/.test(formData.password)) {
+      newErrors.password = 'Password must include uppercase, lowercase, number and special character'
     }
     
     if (formData.password !== formData.confirmPassword) {
