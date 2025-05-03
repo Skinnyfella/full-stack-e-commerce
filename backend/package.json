@@ -7,7 +7,11 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "db:migrate": "sequelize-cli db:migrate",
-    "db:seed": "sequelize-cli db:seed:all"
+    "db:seed": "sequelize-cli db:seed:all",
+    "build": "npm install"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "keywords": [
     "e-commerce",

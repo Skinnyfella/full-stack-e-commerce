@@ -12,62 +12,19 @@ const db = require('./models');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Import routes
-const userRoutes = require('./routes/users');
-const productRoutes = require('./routes/products');
-const cartRoutes = require('./routes/cart');
-const orderRoutes = require('./routes/orders');
-const addressRoutes = require('./routes/addresses');
-const categoryRoutes = require('./routes/categories');
-
-// Middleware
+// Security middleware
 app.use(helmet());
+app.use(helmet.crossOriginResourcePolicy({ policy: "cross-origin" }));
 
-// Enhanced CORS configuration
+// Enhanced CORS configuration for production
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production'
-    ? [process.env.FRONTEND_URL] // Strictly allow only our frontend domain
-    : 'http://localhost:5173',
+  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
-  maxAge: 86400, // 24 hours
-  optionsSuccessStatus: 200
+  maxAge: 600 // Cache preflight requests for 10 minutes
 };
-
 app.use(cors(corsOptions));
-
-app.use(morgan('dev'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Enhanced security middleware configuration
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://rsms.me"],
-      imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", process.env.SUPABASE_URL],
-      fontSrc: ["'self'", "https://rsms.me"],
-      objectSrc: ["'none'"],
-      mediaSrc: ["'self'"],
-      frameSrc: ["'none'"],
-    },
-  },
-  crossOriginEmbedderPolicy: true,
-  crossOriginOpenerPolicy: true,
-  crossOriginResourcePolicy: { policy: "cross-origin" },
-  dnsPrefetchControl: true,
-  frameguard: { action: "deny" },
-  hidePoweredBy: true,
-  hsts: true,
-  ieNoOpen: true,
-  noSniff: true,
-  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
-  xssFilter: true
-}));
 
 // Rate limiting
 const limiter = rateLimit({
@@ -76,27 +33,24 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// Test database connection and initialize categories
-(async () => {
-  try {
-    await db.sequelize.authenticate();
-    console.log('Database connection established successfully.');
-    
-    // Sync database tables
-    await db.sequelize.sync();
-    console.log('Database tables synchronized.');
+// Request logging in production
+if (process.env.NODE_ENV === 'production') {
+  app.use(morgan('combined'));
+} else {
+  app.use(morgan('dev'));
+}
 
-    // Now ensure standard categories exist
-    await db.Category.ensureStandardCategories();
-    console.log('Standard categories initialized.');
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-    app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
-    });
-  } catch (error) {
-    console.error('Unable to connect to the database:', error);
-  }
-})();
+// Import routes
+const userRoutes = require('./routes/users');
+const productRoutes = require('./routes/products');
+const cartRoutes = require('./routes/cart');
+const orderRoutes = require('./routes/orders');
+const addressRoutes = require('./routes/addresses');
+const categoryRoutes = require('./routes/categories');
 
 // Routes
 app.use('/api/users', userRoutes);
@@ -106,21 +60,39 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/addresses', addressRoutes);
 app.use('/api/categories', categoryRoutes);
 
-// Home route
-app.get('/', (req, res) => {
-  res.json({ message: 'E-commerce API running successfully!' });
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'OK', timestamp: new Date() });
 });
 
-// Add a root API route
-app.get('/api', (req, res) => {
-  res.json({ message: 'E-commerce API is available' });
-});
-
-// Error handling middleware
+// Global error handling
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({
-    message: 'Something went wrong!',
-    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+  res.status(err.status || 500).json({
+    error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message
   });
 });
+
+// Handle 404 routes
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found' });
+});
+
+// Database connection and server start
+const startServer = async () => {
+  try {
+    // Verify database connection
+    await db.sequelize.authenticate();
+    console.log('Database connection established successfully.');
+
+    // Start server
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('Unable to connect to the database:', error);
+    process.exit(1);
+  }
+};
+
+startServer();
