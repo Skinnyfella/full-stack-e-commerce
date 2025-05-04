@@ -5,9 +5,6 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 
-// Import database models
-const db = require('./models');
-
 // Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -16,9 +13,9 @@ const PORT = process.env.PORT || 5000;
 app.use(helmet());
 app.use(helmet.crossOriginResourcePolicy({ policy: "cross-origin" }));
 
-// Enhanced CORS configuration for production
+// CORS configuration - temporarily allow all origins
 const corsOptions = {
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: '*', // This will be updated to specific frontend URL after Vercel deployment
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
@@ -78,21 +75,7 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-// Database connection and server start
-const startServer = async () => {
-  try {
-    // Verify database connection
-    await db.sequelize.authenticate();
-    console.log('Database connection established successfully.');
-
-    // Start server
-    app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
-    });
-  } catch (error) {
-    console.error('Unable to connect to the database:', error);
-    process.exit(1);
-  }
-};
-
-startServer();
+// Start server
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
