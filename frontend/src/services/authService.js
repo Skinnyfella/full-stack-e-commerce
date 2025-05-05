@@ -116,16 +116,23 @@ export const authService = {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent'
+        }
       }
     });
     
     if (error) {
+      console.error('Google OAuth error:', error);
       throw new Error(error.message);
     }
     
-    // This may not return user data immediately due to the redirect
-    console.log('Google auth initiated, redirecting...');
+    if (!data) {
+      throw new Error('No data received from Google OAuth');
+    }
+
     return data;
   },
   

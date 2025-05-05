@@ -11,6 +11,7 @@ import LoadingSpinner from './components/common/LoadingSpinner'
 // Lazy-loaded route components
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'))
 const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'))
+const AuthCallback = lazy(() => import('./pages/auth/AuthCallback'))
 const ProductCatalog = lazy(() => import('./pages/customer/ProductCatalog'))
 const ProductDetail = lazy(() => import('./pages/customer/ProductDetail'))
 const Cart = lazy(() => import('./pages/customer/Cart'))
@@ -118,6 +119,7 @@ function App() {
             <Route element={<AuthLayout />}>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
             </Route>
             
             {/* Admin Routes */}
