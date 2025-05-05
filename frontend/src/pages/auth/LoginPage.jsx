@@ -88,6 +88,7 @@ function LoginPage() {
   
   return (
     <div>
+      <h1 className="text-3xl font-bold text-center mb-8 text-gray-900">Cavallo</h1>
       <form onSubmit={handleSubmit} className="space-y-6">
         {errors.general && (
           <div className="rounded-md bg-error-50 p-4">
