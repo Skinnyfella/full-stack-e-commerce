@@ -113,14 +113,13 @@ export const authService = {
   
   // Login with Google
   async loginWithGoogle() {
-    const redirectUrl = import.meta.env.VITE_APP_ENV === 'production'
-      ? 'https://full-stack-e-commerce-6.vercel.app/auth/callback'
-      : `${window.location.origin}/auth/callback`;
+    const currentUrl = window.location.origin;
+    const redirectTo = `${currentUrl}/auth/callback`;
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: redirectUrl,
+        redirectTo,
         queryParams: {
           access_type: 'offline',
           prompt: 'consent'
@@ -133,10 +132,6 @@ export const authService = {
       throw new Error(error.message);
     }
     
-    if (!data) {
-      throw new Error('No data received from Google OAuth');
-    }
-
     return data;
   },
   

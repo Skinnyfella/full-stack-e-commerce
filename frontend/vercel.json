@@ -5,6 +5,10 @@
       "destination": "https://full-stack-e-commerce-6.onrender.com/api/:path*"
     },
     {
+      "source": "/auth/callback",
+      "destination": "/index.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
