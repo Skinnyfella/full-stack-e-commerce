@@ -9,20 +9,49 @@ function AuthCallback() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        // Get the session after OAuth redirect
+        // Handle hash fragment from OAuth redirect
+        if (window.location.hash) {
+          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+          const accessToken = hashParams.get('access_token');
+          
+          if (accessToken) {
+            // Set the session manually since we got the token in the URL hash
+            const { data: { session }, error: sessionError } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: hashParams.get('refresh_token')
+            });
+
+            if (sessionError) {
+              throw sessionError;
+            }
+
+            if (!session) {
+              throw new Error('No session established');
+            }
+
+            // Check user role and redirect accordingly
+            const { data: profile } = await supabase
+              .from('user_profiles')
+              .select('role')
+              .eq('id', session.user.id)
+              .single();
+
+            const role = profile?.role || 'customer';
+            toast.success('Successfully logged in');
+            navigate(role === 'admin' ? '/admin' : '/');
+            return;
+          }
+        }
+
+        // Fallback to getting the session directly
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('Auth callback error:', error);
-          toast.error('Authentication failed');
-          navigate('/login');
-          return;
+          throw error;
         }
 
         if (!session) {
-          toast.error('No session found');
-          navigate('/login');
-          return;
+          throw new Error('No session found');
         }
 
         // Check user role and redirect accordingly
