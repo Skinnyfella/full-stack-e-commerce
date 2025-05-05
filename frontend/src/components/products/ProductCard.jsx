@@ -61,7 +61,7 @@ function ProductCard({ product }) {
       </div>
       
       <div className="p-4 flex-1 flex flex-col">
-        <h3 className="text-lg font-medium text-gray-900 mb-2 line-clamp-1">
+        <h3 className="text-lg font-medium text-gray-900 mb-2 truncate">
           {safeProduct.name}
         </h3>
         
@@ -72,9 +72,7 @@ function ProductCard({ product }) {
         <div className="mt-auto">
           <div className="flex items-center justify-between mb-4">
             <p className="text-xl font-bold text-gray-900">
-              ${typeof safeProduct.price === 'number' 
-                ? safeProduct.price.toFixed(2) 
-                : parseFloat(safeProduct.price).toFixed(2)}
+              ${formatPrice(safeProduct.price)}
             </p>
             <span className={`px-2 py-1 text-xs font-medium rounded-full ${
               safeProduct.status === 'In Stock' 
@@ -96,7 +94,7 @@ function ProductCard({ product }) {
             }`}
             disabled={safeProduct.status === 'Out of Stock'}
           >
-            {safeProduct.status === 'Out of Stock' ? 'Out of Stock' : 'View Details'}
+            {safeProduct.status === 'Out of Stock' ? 'Out of Stock' : 'View Full Details'}
           </Link>
         </div>
       </div>

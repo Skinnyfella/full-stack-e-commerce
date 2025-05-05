@@ -30,7 +30,18 @@ export const testSupabaseConnection = async () => {
 export const testBackendConnection = async () => {
   try {
     // Try to access the root endpoint
-    const data = await apiClient.get('/');
+    const response = await fetch('https://full-stack-e-commerce-6.onrender.com/api/health', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error('Backend API returned an error');
+    }
+    
+    const data = await response.json();
     
     return {
       success: true,
@@ -79,4 +90,4 @@ export const testAuthentication = async () => {
       message: `Authentication test error: ${error.message}`
     };
   }
-}; 
+};

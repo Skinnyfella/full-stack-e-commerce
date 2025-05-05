@@ -235,12 +235,21 @@ export const productService = {
   // Delete a product
   async deleteProduct(id) {
     try {
-      const { error } = await supabase
+      // First, delete any cart items that reference this product
+      const { error: cartError } = await supabase
+        .from('cart_items')
+        .delete()
+        .eq('product_id', id);
+
+      if (cartError) throw cartError;
+
+      // Then delete the product itself
+      const { error: productError } = await supabase
         .from('products')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (productError) throw productError;
 
       return { success: true };
     } catch (error) {

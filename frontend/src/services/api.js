@@ -1,7 +1,7 @@
 import { supabase } from '../utils/supabase';
 
 // API base URL - will be removed once we fully switch to Supabase
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://full-stack-e-commerce-6.onrender.com/api';
 
 // Create a function to get the auth token
 const getAuthToken = async () => {
@@ -221,4 +221,4 @@ export const apiClient = {
     
     return await response.json();
   }
-}; 
+};
